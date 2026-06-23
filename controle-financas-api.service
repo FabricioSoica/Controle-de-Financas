@@ -1,0 +1,15 @@
+[Unit]
+Description=Backend API for Controle de Financas
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/controle-financas/backend
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production PORT=5001
+
+[Install]
+WantedBy=multi-user.target
