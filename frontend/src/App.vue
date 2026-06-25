@@ -773,7 +773,6 @@ const copyToClipboard = (text) => {
                     placeholder="Ex: Santander, Mercado Pago" 
                     class="form-input"
                     list="card-names-list"
-                    required
                   />
                   <!-- HTML5 native autocomplete based on previous items -->
                   <datalist id="card-names-list">
