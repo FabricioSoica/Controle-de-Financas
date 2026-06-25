@@ -178,6 +178,46 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 // FINANCE ENDPOINTS (SECURED)
 // ==========================================
 
+// Get annual evolution summary (last 12 months)
+app.get('/api/finances/summary/evolution', authMiddleware, async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ userId: req.user.id });
+    const monthlyData = {};
+
+    transactions.forEach(t => {
+      const m = t.month;
+      if (!m) return;
+      
+      const [monthStr, yearStr] = m.split('/');
+      const sortKey = `${yearStr}-${monthStr}`;
+      
+      if (!monthlyData[sortKey]) {
+        monthlyData[sortKey] = {
+          monthLabel: m,
+          sortKey,
+          income: 0,
+          card: 0,
+          fixed: 0,
+          variable: 0
+        };
+      }
+      
+      if (t.type === 'income') monthlyData[sortKey].income += t.amount;
+      else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
+      else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
+      else if (t.type === 'variable') monthlyData[sortKey].variable += t.amount;
+    });
+
+    const result = Object.values(monthlyData)
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .slice(-12); // Keep only last 12 months
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar dados de evolução: ' + error.message });
+  }
+});
+
 // Get all transactions for a specific month (e.g. "06/2026")
 app.get('/api/finances/:month', authMiddleware, async (req, res) => {
   try {

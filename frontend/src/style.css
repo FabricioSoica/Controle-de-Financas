@@ -1183,3 +1183,252 @@ a:hover {
   color: var(--text-primary);
 }
 
+/* Annual Evolution Styles */
+.evolution-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.chart-card {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: var(--card-shadow);
+}
+
+.chart-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.legend-color.income {
+  background: var(--color-success);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.legend-color.expense {
+  background: var(--color-danger);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.4);
+}
+
+/* Flexbox Bar Chart */
+.bar-chart-outer {
+  height: 320px;
+  display: flex;
+  padding-bottom: 1rem;
+  position: relative;
+  margin-top: 1rem;
+}
+
+.bar-chart-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 2rem; /* space for labels */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.grid-line {
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+  width: 100%;
+  position: relative;
+}
+
+.grid-label {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.bar-chart-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  padding-left: 3.5rem; /* space for grid labels */
+  z-index: 1;
+}
+
+.bar-chart-month-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  width: 8%;
+  min-width: 50px;
+}
+
+.bars-wrapper {
+  height: 80%; /* leave space for labels */
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+  position: relative;
+}
+
+.bar-item {
+  width: 14px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s ease, filter 0.3s ease;
+  min-height: 2px; /* ensure tiny values are visible */
+  animation: growBar 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  transform-origin: bottom;
+}
+
+@keyframes growBar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.bar-item:hover {
+  transform: scaleY(1.05);
+  filter: brightness(1.2);
+}
+
+.bar-item.income {
+  background: linear-gradient(to top, #059669, var(--color-success));
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+}
+
+.bar-item.expense {
+  background: linear-gradient(to top, #e11d48, var(--color-danger));
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
+}
+
+/* Tooltip on hover */
+.bar-tooltip {
+  visibility: hidden;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.bar-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
+}
+
+.bar-item:hover .bar-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+
+.month-bar-label {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Table styles */
+.evolution-table-container {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.evolution-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.evolution-table th {
+  padding: 0.75rem 1rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.evolution-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.evolution-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.badge-surplus {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.badge-deficit {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--color-danger);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+
