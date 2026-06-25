@@ -55,3 +55,44 @@ jobs:
             cd ../frontend
             npm install
             npm run build
+
+      - name: Discord Notification on Success
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "embeds": [{
+                   "title": "🚀 Deploy Realizado com Sucesso!",
+                   "description": "O deploy do **Controle de Finanças** foi concluído com sucesso na VM!",
+                   "color": 3066993,
+                   "fields": [
+                     { "name": "Repositório", "value": "${{ github.repository }}", "inline": true },
+                     { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
+                     { "name": "Commit", "value": "[${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})", "inline": false }
+                   ],
+                   "footer": { "text": "GitHub Actions Pipeline" }
+                 }]
+               }' \
+               ${{ secrets.DISCORD_WEBHOOK }}
+
+      - name: Discord Notification on Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "embeds": [{
+                   "title": "❌ Falha no Deploy!",
+                   "description": "Ocorreu um erro durante a execução da pipeline de deploy do **Controle de Finanças**.",
+                   "color": 15158332,
+                   "fields": [
+                     { "name": "Repositório", "value": "${{ github.repository }}", "inline": true },
+                     { "name": "Branch", "value": "${{ github.ref_name }}", "inline": true },
+                     { "name": "Commit", "value": "[${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})", "inline": false },
+                     { "name": "Workflow Run", "value": "[Visualizar Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})", "inline": false }
+                   ],
+                   "footer": { "text": "GitHub Actions Pipeline" }
+                 }]
+               }' \
+               ${{ secrets.DISCORD_WEBHOOK }}
