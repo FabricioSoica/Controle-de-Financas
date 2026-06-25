@@ -529,13 +529,6 @@ const copyToClipboard = (text) => {
           >
             <i class="fa-solid fa-cart-shopping"></i> Lista de Compras
           </button>
-          <!-- <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'config' }" 
-            @click="activeTab = 'config'"
-          >
-            <i class="fa-solid fa-server"></i> Servidor VM
-          </button> -->
         </nav>
 
         <div v-if="isAuthenticated" class="user-profile-badge">
@@ -553,7 +546,6 @@ const copyToClipboard = (text) => {
         <div class="auth-header">
           <i class="fa-solid fa-wallet" style="font-size: 3rem; background: linear-gradient(135deg, var(--color-primary), #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 2px 10px rgba(99,102,241,0.3));"></i>
           <h2 style="font-family: var(--font-heading); font-size: 1.6rem; margin-top: 1rem; font-weight: 800;">Controle de Finanças</h2>
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">Hospedagem multifólio na sua VM</p>
         </div>
 
         <!-- Auth Tabs -->
@@ -1099,155 +1091,6 @@ const copyToClipboard = (text) => {
           </div>
         </div>
 
-        <!-- TAB 3: SERVER VM CONFIGURATION -->
-        <div v-if="activeTab === 'config'" class="config-container">
-          <div class="config-card">
-            <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-              <i class="fa-solid fa-network-wired" style="color: var(--color-primary);"></i>
-              Configuração de Hospedagem Multifólio na VM (Nginx)
-            </h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">
-              Para hospedar este novo sistema de finanças na mesma Máquina Virtual do Taekwondo Piedade, utilizaremos Nginx blocks separados e PM2 para manter o backend Node.js em execução ininterrupta.
-            </p>
-
-            <div class="config-steps">
-              <!-- Step 1: Directory Structure -->
-              <div class="config-step">
-                <div class="step-number">1</div>
-                <div class="step-content">
-                  <div class="step-title">Preparação de Diretórios no Servidor</div>
-                  <div class="step-desc">Acesse sua VM via SSH e crie os diretórios de publicação dedicados na pasta <code>/var/www/</code>:</div>
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>SSH Terminal</span>
-                      <button class="btn-copy" @click="copyToClipboard('sudo mkdir -p /var/www/controle-financas/html\nsudo chown -R ubuntu:ubuntu /var/www/controle-financas')">
-                        <i class="fa-regular fa-copy"></i> Copiar
-                      </button>
-                    </div>
-                    <div class="code-content">sudo mkdir -p /var/www/controle-financas/html
-sudo chown -R ubuntu:ubuntu /var/www/controle-financas</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 2: PM2 Backend Setup -->
-              <div class="config-step">
-                <div class="step-number">2</div>
-                <div class="step-content">
-                  <div class="step-title">Executando o Backend com PM2</div>
-                  <div class="step-desc">Na VM, instale o PM2 para gerenciar o processo Node.js em background e garantir que ele inicie junto com o servidor:</div>
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>SSH Terminal</span>
-                      <button class="btn-copy" @click="copyToClipboard('sudo npm install -g pm2\ncd /var/www/controle-financas/backend\npm2 start server.js --name &quot;financas-api&quot;\npm2 save\npm2 startup')">
-                        <i class="fa-regular fa-copy"></i> Copiar
-                      </button>
-                    </div>
-                    <div class="code-content">sudo npm install -g pm2
-cd /var/www/controle-financas/backend  # (transfira o backend para cá e configure o .env)
-pm2 start server.js --name "financas-api"
-pm2 save
-pm2 startup</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 3: Nginx Virtual Host -->
-              <div class="config-step">
-                <div class="step-number">3</div>
-                <div class="step-content">
-                  <div class="step-title">Criar a Configuração no Nginx</div>
-                  <div class="step-desc">Crie um novo arquivo de configuração virtual host na VM para responder ao seu domínio de finanças (ex: <code>financas.seudominio.com</code>):</div>
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>SSH Terminal</span>
-                      <button class="btn-copy" @click="copyToClipboard('sudo nano /etc/nginx/sites-available/controle-financas')">
-                        <i class="fa-regular fa-copy"></i> Copiar comando
-                      </button>
-                    </div>
-                    <div class="code-content">sudo nano /etc/nginx/sites-available/controle-financas</div>
-                  </div>
-                  
-                  <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0.75rem 0 0.35rem 0;">Cole o seguinte bloco Nginx customizado no arquivo editado:</p>
-                  
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>/etc/nginx/sites-available/controle-financas</span>
-                      <button class="btn-copy" @click="copyToClipboard('server {\n    listen 80;\n    listen [::]:80;\n\n    # Altere para o seu domínio cadastrado no DNS\n    server_name financas.seudominio.com;\n\n    # Frontend construído estático (dist)\n    root /var/www/controle-financas/html;\n    index index.html;\n\n    # Roteamento Vue SPA\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n    # Proxy Reverso para a API Node local rodando na porta 5001\n    location /api/ {\n        proxy_pass http://localhost:5001/api/;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \'upgrade\';\n        proxy_set_header Host $host;\n        proxy_cache_bypass $http_upgrade;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n    }\n}')">
-                        <i class="fa-regular fa-copy"></i> Copiar Configuração
-                      </button>
-                    </div>
-                    <div class="code-content">server {
-    listen 80;
-    listen [::]:80;
-
-    # Altere para o subdomínio apontado no seu DNS
-    server_name financas.seudominio.com;
-
-    root /var/www/controle-financas/html;
-    index index.html;
-
-    # Roteamento Vue SPA
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Proxy Reverso para a API Node local na porta 5001
-    location /api/ {
-        proxy_pass http://localhost:5001/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 4: Activating new website -->
-              <div class="config-step">
-                <div class="step-number">4</div>
-                <div class="step-content">
-                  <div class="step-title">Ativar o Site e Recarregar o Nginx</div>
-                  <div class="step-desc">Crie um link simbólico para ativar a configuração e reinicie o Nginx para aplicar as alterações:</div>
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>SSH Terminal</span>
-                      <button class="btn-copy" @click="copyToClipboard('sudo ln -s /etc/nginx/sites-available/controle-financas /etc/nginx/sites-enabled/\nsudo nginx -t\nsudo systemctl restart nginx')">
-                        <i class="fa-regular fa-copy"></i> Copiar
-                      </button>
-                    </div>
-                    <div class="code-content">sudo ln -s /etc/nginx/sites-available/controle-financas /etc/nginx/sites-enabled/
-sudo nginx -t                # Testa se a sintaxe está OK
-sudo systemctl restart nginx # Aplica as alterações</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 5: Let's Encrypt SSL -->
-              <div class="config-step">
-                <div class="step-number">5</div>
-                <div class="step-content">
-                  <div class="step-title">Segurança com SSL Grátis (HTTPS)</div>
-                  <div class="step-desc">Assim como no site do TaeKwonDo, execute o Certbot para obter o certificado SSL gratuito e configurar o redirecionamento automático de HTTP para HTTPS:</div>
-                  <div class="code-block-wrapper">
-                    <div class="code-header">
-                      <span>SSH Terminal</span>
-                      <button class="btn-copy" @click="copyToClipboard('sudo certbot --nginx -d financas.seudominio.com')">
-                        <i class="fa-regular fa-copy"></i> Copiar
-                      </button>
-                    </div>
-                    <div class="code-content">sudo certbot --nginx -d financas.seudominio.com</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
 
