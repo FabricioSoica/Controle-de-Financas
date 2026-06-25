@@ -19,6 +19,7 @@ const selectedMonth = ref(''); // YYYY-MM
 const transactions = ref([]);
 const shoppingItems = ref([]);
 const toasts = ref([]);
+const importLoading = ref(false);
 
 // Form states - Transactions
 const transId = ref(null);
@@ -71,6 +72,19 @@ const getMonthYearString = (ym) => {
   if (!ym) return '';
   const [year, month] = ym.split('-');
   return `${month}/${year}`;
+};
+
+// Helper to get previous month in YYYY-MM format
+const getPreviousMonth = (ym) => {
+  if (!ym) return '';
+  const [year, month] = ym.split('-').map(Number);
+  let prevMonth = month - 1;
+  let prevYear = year;
+  if (prevMonth === 0) {
+    prevMonth = 12;
+    prevYear = year - 1;
+  }
+  return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 };
 
 // Scoped headers helper
@@ -188,6 +202,74 @@ const fetchTransactions = async () => {
     transactions.value = await res.json();
   } catch (error) {
     showToast(error.message, 'error');
+  }
+};
+
+const importFixedExpenses = async () => {
+  const prevMonthYM = getPreviousMonth(selectedMonth.value);
+  if (!prevMonthYM) return;
+
+  const formattedPrevMonth = getMonthYearString(prevMonthYM);
+  const urlMonth = formattedPrevMonth.replace('/', '-');
+
+  try {
+    importLoading.value = true;
+    
+    // 1. Fetch previous month transactions
+    const res = await fetch(`${API_URL}/api/finances/${urlMonth}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Não foi possível buscar os lançamentos do mês anterior');
+
+    const prevTransactions = await res.json();
+    
+    // 2. Filter for fixed expenses
+    const fixedExpenses = prevTransactions.filter(t => t.type === 'fixed');
+    
+    if (fixedExpenses.length === 0) {
+      showToast('Nenhum gasto fixo encontrado no mês anterior para importar.', 'info');
+      return;
+    }
+
+    // 3. Confirm with user
+    if (!confirm(`Deseja importar ${fixedExpenses.length} gastos fixos de ${formattedPrevMonth} para o mês atual?`)) {
+      return;
+    }
+
+    // 4. Send POST requests sequentially for each fixed expense
+    let successCount = 0;
+    for (const expense of fixedExpenses) {
+      const payload = {
+        description: expense.description,
+        amount: expense.amount,
+        type: 'fixed',
+        cardName: '',
+        month: getMonthYearString(selectedMonth.value),
+        info: expense.info || ''
+      };
+
+      const postRes = await fetch(`${API_URL}/api/finances`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      if (postRes.ok) {
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      showToast(`${successCount} gastos fixos importados com sucesso!`);
+      fetchTransactions();
+    } else {
+      throw new Error('Falha ao importar os gastos fixos');
+    }
+
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    importLoading.value = false;
   }
 };
 
@@ -618,6 +700,16 @@ const copyToClipboard = (text) => {
           />
           <button class="btn-today" @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`">
             Mês Atual
+          </button>
+          <button 
+            v-if="transFixeds.length === 0" 
+            class="btn-today animate-pulse" 
+            @click="importFixedExpenses" 
+            :disabled="importLoading"
+            style="margin-left: 0.5rem; background: linear-gradient(135deg, var(--color-primary), #a855f7); color: white; border: none; font-weight: 600;"
+          >
+            <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i> Importando...</span>
+            <span v-else><i class="fa-solid fa-cloud-arrow-down"></i> Importar Fixos</span>
           </button>
         </div>
         <div>
