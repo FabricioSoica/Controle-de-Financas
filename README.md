@@ -145,4 +145,4 @@ Execute o Certbot para configurar automaticamente a criptografia SSL e redirecio
 sudo certbot --nginx -d financas.seudominio.com
 ```
 
-Pronto! Seu novo site de finanças estará rodando na mesma VM com segurança máxima e baixo consumo de recursos! 
+Pronto! Seu novo site de finanças estará rodando na mesma VM com segurança máxima e baixo consumo de recursos!
