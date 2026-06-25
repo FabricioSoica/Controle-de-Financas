@@ -1055,6 +1055,13 @@ a:hover {
   font-size: 0.85rem;
 }
 
+.user-profile-badge span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
 .btn-logout {
   background: rgba(244, 63, 94, 0.08);
   border: 1px solid rgba(244, 63, 94, 0.15);
@@ -1430,5 +1437,194 @@ a:hover {
   border-radius: 4px;
   font-weight: 700;
 }
+
+/* ==========================================
+   EXPERIÊNCIA PREMIUM E RESPONSIVIDADE NATIVA PARA CELULAR (MOBILE-LIKE)
+   ========================================== */
+@media (max-width: 768px) {
+  /* Espaço extra na parte inferior do corpo para acomodar a barra flutuante */
+  body {
+    padding-bottom: 85px !important;
+  }
+  
+  .app-container {
+    padding: 0.75rem !important;
+  }
+  
+  /* Topbar super limpa: logo na esquerda e Perfil/Sair na direita */
+  .app-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
+    gap: 0.5rem !important;
+  }
+  
+  .logo-section {
+    justify-content: flex-start !important;
+  }
+  
+  .logo-text {
+    font-size: 1.2rem !important;
+  }
+  
+  .logo-icon {
+    font-size: 1.6rem !important;
+  }
+  
+  .logo-sub {
+    display: none !important; /* Esconde slogan para economizar espaço vertical */
+  }
+  
+  /* Barra de Navegação Flutuante no Rodapé (Estilo App Nativo) */
+  .nav-tabs {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    padding: 0.5rem 0.25rem !important;
+    display: flex !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    gap: 0 !important;
+    z-index: 9999 !important;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4) !important;
+  }
+  
+  .tab-btn {
+    flex-direction: column !important;
+    gap: 0.2rem !important;
+    font-size: 0.625rem !important;
+    font-weight: 600 !important;
+    padding: 0.4rem 0 !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    flex: 1 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  .tab-btn i {
+    font-size: 1.25rem !important;
+    margin: 0 !important;
+  }
+  
+  .tab-btn.active {
+    color: var(--color-primary) !important;
+    background: transparent !important;
+    transform: scale(1.05);
+  }
+  
+  .user-profile-badge {
+    width: auto !important;
+    margin-top: 0 !important;
+    font-size: 0.8rem !important;
+    padding: 0.35rem 0.6rem !important;
+    border-radius: var(--radius-sm) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+  }
+  
+  .btn-logout {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .btn-logout-text {
+    display: none !important;
+  }
+  
+  /* Filtros e Seletores de Competência */
+  .filter-bar {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .month-picker-container {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  /* Evita que o gráfico de evolução seja comprimido e permite scroll lateral */
+  .bar-chart-outer {
+    overflow-x: auto;
+    padding-bottom: 2rem;
+  }
+  
+  .bar-chart-content {
+    min-width: 620px;
+  }
+
+  /* Previne zoom automático e indesejado ao focar inputs no iOS */
+  input, select, textarea {
+    font-size: 16px !important; 
+  }
+  
+  /* Aumenta área de clique dos botões para facilitar toque no celular */
+  .btn {
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .shopping-summary-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .shopping-item-card {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+    text-align: center;
+  }
+  
+  .shopping-item-info {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  
+  .shopping-item-details {
+    align-items: center;
+  }
+  
+  .shopping-item-price {
+    text-align: center;
+  }
+  
+  .shopping-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .relevance-controls {
+    margin-right: 0;
+  }
+}
+
+
 
 

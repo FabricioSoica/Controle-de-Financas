@@ -116,7 +116,7 @@ const handleUnauthorized = () => {
         <div v-if="isAuthenticated" class="user-profile-badge">
           <span><i class="fa-solid fa-circle-user" style="color: var(--color-primary);"></i> <strong>{{ username }}</strong></span>
           <button class="btn-logout" @click="handleLogout" title="Sair do Sistema" type="button">
-            <i class="fa-solid fa-right-from-bracket"></i> Sair
+            <i class="fa-solid fa-right-from-bracket"></i> <span class="btn-logout-text">Sair</span>
           </button>
         </div>
       </div>
