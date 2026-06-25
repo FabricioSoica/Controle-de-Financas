@@ -73,7 +73,7 @@ const handleAuth = async () => {
       <div class="auth-header">
         <i class="fa-solid fa-wallet" style="font-size: 3rem; background: linear-gradient(135deg, var(--color-primary), #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 2px 10px rgba(99,102,241,0.3));"></i>
         <h2 style="font-family: var(--font-heading); font-size: 1.6rem; margin-top: 1rem; font-weight: 800;">Controle de Finanças</h2>
-        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">Hospedagem multifólio na sua VM</p>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">Controle e Vizualização do seu bolso!</p>
       </div>
 
       <!-- Auth Tabs -->
