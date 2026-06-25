@@ -159,17 +159,17 @@ const handleUnauthorized = () => {
     </main>
 
     <!-- Glassmorphism Toast Notifications -->
-    <div class="toasts-container">
+    <div class="toast-container">
       <div 
         v-for="toast in toasts" 
         :key="toast.id" 
-        class="toast-msg" 
+        class="toast" 
         :class="toast.type"
       >
         <span class="toast-icon">
-          <i v-if="toast.type === 'success'" class="fa-solid fa-circle-check"></i>
-          <i v-else-if="toast.type === 'error'" class="fa-solid fa-triangle-exclamation"></i>
-          <i v-else-if="toast.type === 'info'" class="fa-solid fa-circle-info"></i>
+          <i v-if="toast.type === 'success'" class="fa-solid fa-circle-check" style="color: var(--color-success);"></i>
+          <i v-else-if="toast.type === 'error'" class="fa-solid fa-triangle-exclamation" style="color: var(--color-danger);"></i>
+          <i v-else-if="toast.type === 'info'" class="fa-solid fa-circle-info" style="color: var(--color-info);"></i>
         </span>
         <span class="toast-text">{{ toast.message }}</span>
       </div>
