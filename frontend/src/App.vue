@@ -102,14 +102,6 @@ const handleUnauthorized = () => {
           >
             <i class="fa-solid fa-cart-shopping"></i> Lista de Compras
           </button>
-          <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'config' }" 
-            @click="activeTab = 'config'"
-            type="button"
-          >
-            <i class="fa-solid fa-server"></i> Servidor VM
-          </button>
         </nav>
 
         <!-- User profile badge (only if authenticated) -->

@@ -1591,37 +1591,105 @@ a:hover {
     flex-direction: column;
     text-align: center;
     gap: 1rem;
+    padding: 1rem !important;
   }
   
+  .shopping-summary-total {
+    font-size: 1.5rem !important;
+  }
+  
+  /* Layout horizontal ultra-compact para os itens de desejo no celular */
   .shopping-item-card {
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    justify-content: center;
-    text-align: center;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 0.5rem 0.75rem !important;
+    gap: 0.5rem !important;
+    text-align: left !important;
+  }
+  
+  /* Oculta o botão de arrastar no toque, já que HTML5 drag-and-drop não é nativo em mobile */
+  .drag-handle {
+    display: none !important;
+  }
+  
+  /* Controles de relevância por seta destacados e fáceis de tocar */
+  .relevance-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.2rem !important;
+    margin-right: 0.25rem !important;
+  }
+  
+  .relevance-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.7rem !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-primary) !important;
   }
   
   .shopping-item-info {
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.5rem !important;
+    width: auto !important;
+    flex-grow: 1 !important;
   }
   
   .shopping-item-details {
-    align-items: center;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.15rem !important;
+  }
+  
+  .shopping-item-name {
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    max-width: 120px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  
+  .shopping-item-link-badge {
+    font-size: 0.65rem !important;
+    padding: 0.15rem 0.35rem !important;
   }
   
   .shopping-item-price {
-    text-align: center;
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
+    text-align: right !important;
   }
   
+  /* Ações compactas no lado direito */
   .shopping-actions {
-    width: 100%;
-    justify-content: center;
+    width: auto !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 0.35rem !important;
   }
   
-  .relevance-controls {
-    margin-right: 0;
+  .shopping-actions .action-btn {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.75rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
   }
 }
 
