@@ -197,11 +197,6 @@ const saveTransaction = async () => {
     return;
   }
 
-  if (transType.value === 'card' && !transCardName.value) {
-    showToast('Por favor, selecione ou digite o nome do cartão de crédito.', 'error');
-    return;
-  }
-
   const payload = {
     description: transDesc.value,
     amount: parseFloat(transAmount.value),
