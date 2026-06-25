@@ -3,18 +3,16 @@ name: Deploy pipeline
 on:
   push:
     branches:
-      - main # Executa o deploy sempre que houver push na branch main
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Copia o código do repositório para a máquina virtual do GitHub
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configura a versão correta do Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -24,7 +22,6 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
 
-      # 3. Faz o build do Frontend (Vue.js) para garantir que não há erros de compilação
       - name: Install and Build Frontend
         run: |
           cd frontend
@@ -33,7 +30,6 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }} 
 
-      # 4. Conecta ao servidor via SSH e executa os comandos de atualização
       - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -42,17 +38,18 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            # Navega até a pasta do projeto configurada no servidor
+            # Navega até a pasta do projeto
             cd /var/www/html/controle-financas
 
-            # Atualiza o código com a versão mais recente do GitHub
+            # Atualiza o código com a versão mais recente do GitHub (agora autenticado)
             git pull origin main
 
             # Atualiza e reinicia o Backend
             cd backend
             npm install --production
-            # Reinicia o processo da API no PM2 (ajuste o nome 'backend-app' se necessário)
-            pm2 restart backend-app || pm2 start dist/main.js --name "backend-app"
+            
+            # Reinicia o processo correto no PM2 (financas-api rodando server.js)
+            pm2 restart financas-api || pm2 start server.js --name "financas-api"
 
             # Atualiza e compila o Frontend no servidor
             cd ../frontend
