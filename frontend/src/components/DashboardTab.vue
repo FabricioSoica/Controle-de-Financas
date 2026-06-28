@@ -30,6 +30,15 @@ const targetNetResult = ref(0);
 const showGoalModal = ref(false);
 const tempGoalValue = ref('');
 const annualEvolution = ref([]);
+const showCardConfig = ref(false);
+const visibleCards = ref({
+  income: true,
+  card: true,
+  fixed: true,
+  variable: true,
+  net: true,
+  cumulative: true
+});
 const isEditingTrans = ref(false);
 
 // Collapsible Credit Cards State
@@ -60,6 +69,15 @@ const getMonthYearString = (ym) => {
 
 // Fetch data on mount
 onMounted(() => {
+  const stored = localStorage.getItem('financas_visible_cards');
+  if (stored) {
+    try {
+      visibleCards.value = { ...visibleCards.value, ...JSON.parse(stored) };
+    } catch (e) {
+      console.error('Error loading card visibility preferences:', e);
+    }
+  }
+
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const year = now.getFullYear();
@@ -73,6 +91,10 @@ onMounted(() => {
 watch(selectedMonth, () => {
   fetchTransactions();
 });
+
+watch(visibleCards, (newVal) => {
+  localStorage.setItem('financas_visible_cards', JSON.stringify(newVal));
+}, { deep: true });
 
 const fetchMonthlyGoal = async () => {
   if (!props.token) return;
@@ -393,6 +415,44 @@ const getCardUsagePercentage = (cardTotal) => {
         >
           <i class="fa-solid fa-file-excel" style="color: var(--color-success);"></i> Exportar Mês
         </button>
+
+        <!-- Backdrop to close dropdown click-outside -->
+        <div v-if="showCardConfig" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent;" @click="showCardConfig = false"></div>
+
+        <!-- Card Configuration Dropdown Button -->
+        <div style="position: relative; z-index: 1000;">
+          <button 
+            class="btn-today" 
+            @click="showCardConfig = !showCardConfig"
+            type="button"
+            style="display: flex; align-items: center; gap: 0.4rem;"
+            title="Configurar visibilidade dos cards"
+          >
+            <i class="fa-solid fa-sliders"></i> Cards
+          </button>
+          
+          <div v-if="showCardConfig" class="card-config-dropdown">
+            <div class="card-config-header">Exibição de Cards</div>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.income" /> Receita Total
+            </label>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.card" /> Gastos Cartão
+            </label>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.fixed" /> Gastos Fixos
+            </label>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.variable" /> Outros Gastos
+            </label>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.net" /> Resultado Líquido
+            </label>
+            <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.cumulative" /> Acumulado do Ano
+            </label>
+          </div>
+        </div>
       </div>
       <div>
         <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
@@ -403,35 +463,35 @@ const getCardUsagePercentage = (cardTotal) => {
 
     <!-- Top KPI Grid -->
     <div class="summary-grid">
-      <div class="summary-card card-income">
+      <div v-if="visibleCards.income" class="summary-card card-income">
         <span class="card-icon"><i class="fa-solid fa-circle-arrow-up"></i></span>
         <div class="card-title">Receita Total</div>
         <div class="card-value text-success">{{ formatCurrency(totalIncomes) }}</div>
         <div class="card-sub-calc">Entradas no mês</div>
       </div>
       
-      <div class="summary-card card-card">
+      <div v-if="visibleCards.card" class="summary-card card-card">
         <span class="card-icon"><i class="fa-solid fa-credit-card"></i></span>
         <div class="card-title">Gastos com Cartões</div>
         <div class="card-value text-danger">{{ formatCurrency(totalCards) }}</div>
         <div class="card-sub-calc">Dividido por cartão abaixo</div>
       </div>
 
-      <div class="summary-card card-fixed">
+      <div v-if="visibleCards.fixed" class="summary-card card-fixed">
         <span class="card-icon"><i class="fa-solid fa-house-lock"></i></span>
         <div class="card-title">Gastos Fixos</div>
         <div class="card-value text-warning">{{ formatCurrency(totalFixeds) }}</div>
         <div class="card-sub-calc">Assinaturas, Financiamentos, etc</div>
       </div>
 
-      <div class="summary-card card-variable">
+      <div v-if="visibleCards.variable" class="summary-card card-variable">
         <span class="card-icon"><i class="fa-solid fa-basket-shopping"></i></span>
         <div class="card-title">Outros Gastos</div>
         <div class="card-value text-info">{{ formatCurrency(totalVariables) }}</div>
         <div class="card-sub-calc">Empréstimos, Pgto Pessoas, etc</div>
       </div>
 
-      <div class="summary-card card-net">
+      <div v-if="visibleCards.net" class="summary-card card-net">
         <span class="card-icon"><i class="fa-solid fa-scale-balanced"></i></span>
         <div class="card-title" style="color: var(--color-primary);">Resultado Líquido</div>
         <div class="card-value" :class="netPostFixed >= 0 ? 'text-success' : 'text-danger'">
@@ -465,7 +525,7 @@ const getCardUsagePercentage = (cardTotal) => {
       </div>
 
       <!-- Cumulative YTD Card -->
-      <div class="summary-card card-cumulative">
+      <div v-if="visibleCards.cumulative" class="summary-card card-cumulative">
         <span class="card-icon"><i class="fa-solid fa-piggy-bank"></i></span>
         <div class="card-title" style="color: var(--color-success);">Acumulado do Ano</div>
         <div class="card-value" :class="cumulativeYearNetResult >= 0 ? 'text-success' : 'text-danger'">
@@ -845,5 +905,56 @@ const getCardUsagePercentage = (cardTotal) => {
   width: 4px;
   height: 100%;
   background: linear-gradient(to bottom, var(--color-success), #10b981);
+}
+
+.card-config-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: #111827;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+  z-index: 1000;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.card-config-header {
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  transition: var(--transition-smooth);
+}
+
+.config-checkbox-label:hover {
+  color: #fff;
+}
+
+.config-checkbox-label input {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  width: 15px;
+  height: 15px;
 }
 </style>
