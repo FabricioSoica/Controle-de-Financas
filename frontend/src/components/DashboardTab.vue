@@ -27,6 +27,8 @@ const transCardName = ref('');
 const transInfo = ref('');
 const transInstallments = ref(1);
 const targetNetResult = ref(0);
+const showGoalModal = ref(false);
+const tempGoalValue = ref('');
 const isEditingTrans = ref(false);
 
 // Collapsible Credit Cards State
@@ -87,14 +89,13 @@ const fetchMonthlyGoal = async () => {
   }
 };
 
-const changeMonthlyGoal = async () => {
-  const input = prompt(
-    `Defina a meta de Resultado Líquido (Investimentos) para ${getMonthYearString(selectedMonth.value)} (R$):`,
-    targetNetResult.value || ''
-  );
-  if (input === null) return;
-  
-  const val = parseFloat(input);
+const changeMonthlyGoal = () => {
+  tempGoalValue.value = targetNetResult.value || '';
+  showGoalModal.value = true;
+};
+
+const saveMonthlyGoal = async () => {
+  const val = parseFloat(tempGoalValue.value);
   if (isNaN(val) || val < 0) {
     emit('toast', { message: 'Por favor, insira um valor válido maior ou igual a zero.', type: 'error' });
     return;
@@ -112,6 +113,7 @@ const changeMonthlyGoal = async () => {
     if (!res.ok) throw new Error('Não foi possível salvar a meta');
     const data = await res.json();
     targetNetResult.value = data.targetNetResult;
+    showGoalModal.value = false;
     emit('toast', { message: 'Meta de investimentos atualizada com sucesso!', type: 'success' });
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
@@ -662,5 +664,92 @@ const getCardUsagePercentage = (cardTotal) => {
         </div>
       </div>
     </div>
+
+    <!-- Beautiful Custom Modal for Setting Monthly Goal -->
+    <div v-if="showGoalModal" class="modal-overlay" @click.self="showGoalModal = false">
+      <div class="modal-card">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; color: var(--text-primary);">
+            <i class="fa-solid fa-bullseye" style="color: var(--color-primary);"></i>
+            Meta de Investimento
+          </h3>
+          <button @click="showGoalModal = false" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body" style="padding: 1.25rem 0 1.5rem 0;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; text-align: left; line-height: 1.4;">
+            Defina o valor líquido (sobra de caixa) que você deseja atingir para investimentos em <strong style="color: var(--text-primary);">{{ getMonthYearString(selectedMonth) }}</strong>.
+          </p>
+          <div class="form-group" style="text-align: left; margin-bottom: 0;">
+            <label class="form-label">Valor Alvo (R$)</label>
+            <div style="position: relative;">
+              <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 600; font-size: 0.95rem;">R$</span>
+              <input 
+                type="number" 
+                step="0.01" 
+                min="0" 
+                v-model="tempGoalValue" 
+                placeholder="0,00" 
+                class="form-input" 
+                style="padding-left: 2.75rem; width: 100%;"
+                required
+                @keyup.enter="saveMonthlyGoal"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <button @click="showGoalModal = false" class="btn btn-secondary" type="button" style="min-height: 38px;">Cancelar</button>
+          <button @click="saveMonthlyGoal" class="btn btn-primary" type="button" style="min-height: 38px;">
+            <i class="fa-solid fa-check"></i> Salvar Meta
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(4, 6, 10, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.modal-card {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  max-width: 420px;
+  padding: 1.5rem;
+  margin: 1.5rem;
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+</style>
