@@ -726,9 +726,7 @@ const getCardUsagePercentage = (cardTotal) => {
 }
 
 .modal-card {
-  background: var(--bg-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: #111827; /* Solid background, no transparency */
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
