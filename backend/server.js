@@ -12,21 +12,34 @@ const MonthlyGoal = require('./models/MonthlyGoal');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'controle-financas-secret-key-12345';
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('ERRO CRÍTICO: A variável de ambiente JWT_SECRET não está definida!');
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://<USUARIO>:<SENHA>@<SEU_CLUSTER>.mongodb.net/?appName=ControleFinancas';
+const MONGO_URI = process.env.MONGO_URI;
+if (!MONGO_URI) {
+  console.error('ERRO CRÍTICO: A variável de ambiente MONGO_URI não está definida!');
+  process.exit(1);
+}
+
 mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Successfully connected to MongoDB.');
     // Run DB migrations for existing/orphan data
     migrateOrphans();
   })
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });
 
 // ==========================================
 // DB MIGRATION FOR ORPHAN DATA
