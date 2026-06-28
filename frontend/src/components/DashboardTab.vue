@@ -70,18 +70,15 @@ onMounted(() => {
 // Watch month changes to reload transactions
 watch(selectedMonth, () => {
   fetchTransactions();
-  fetchMonthlyGoal();
 });
 
 const fetchMonthlyGoal = async () => {
   if (!props.token) return;
   try {
-    const formattedMonth = getMonthYearString(selectedMonth.value);
-    const urlMonth = formattedMonth.replace('/', '-');
-    const res = await fetch(`${props.apiUrl}/api/finances/goal/${urlMonth}`, {
+    const res = await fetch(`${props.apiUrl}/api/finances/goal`, {
       headers: getHeaders()
     });
-    if (!res.ok) throw new Error('Falha ao buscar meta do mês');
+    if (!res.ok) throw new Error('Falha ao buscar meta');
     const data = await res.json();
     targetNetResult.value = data.targetNetResult || 0;
   } catch (error) {
@@ -106,7 +103,6 @@ const saveMonthlyGoal = async () => {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
-        month: getMonthYearString(selectedMonth.value),
         targetNetResult: val
       })
     });
@@ -680,7 +676,7 @@ const getCardUsagePercentage = (cardTotal) => {
         
         <div class="modal-body" style="padding: 1.25rem 0 1.5rem 0;">
           <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; text-align: left; line-height: 1.4;">
-            Defina o valor líquido (sobra de caixa) que você deseja atingir para investimentos em <strong style="color: var(--text-primary);">{{ getMonthYearString(selectedMonth) }}</strong>.
+            Defina o valor líquido (sobra de caixa) global que você deseja atingir para investimentos.
           </p>
           <div class="form-group" style="text-align: left; margin-bottom: 0;">
             <label class="form-label">Valor Alvo (R$)</label>

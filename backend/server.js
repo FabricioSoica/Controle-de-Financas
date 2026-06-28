@@ -219,44 +219,42 @@ app.get('/api/finances/summary/evolution', authMiddleware, async (req, res) => {
   }
 });
 
-// Get goal for a specific month
-app.get('/api/finances/goal/:month', authMiddleware, async (req, res) => {
+// Get global goal for the user
+app.get('/api/finances/goal', authMiddleware, async (req, res) => {
   try {
-    const month = req.params.month.replace(/[-_]/g, '/');
-    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month });
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: 'global' });
     if (!goal) {
-      return res.json({ month, targetNetResult: 0 });
+      return res.json({ targetNetResult: 0 });
     }
     res.json(goal);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar meta do mês: ' + error.message });
+    res.status(500).json({ error: 'Erro ao buscar meta: ' + error.message });
   }
 });
 
-// Set or update goal for a specific month
+// Set or update global goal for the user
 app.post('/api/finances/goal', authMiddleware, async (req, res) => {
   try {
-    const { month, targetNetResult } = req.body;
-    if (!month || targetNetResult === undefined) {
-      return res.status(400).json({ error: 'Campos obrigatórios ausentes: mês e valor da meta.' });
+    const { targetNetResult } = req.body;
+    if (targetNetResult === undefined) {
+      return res.status(400).json({ error: 'Campo obrigatório ausente: valor da meta.' });
     }
-    const monthFormatted = month.replace(/[-_]/g, '/');
     
-    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: monthFormatted });
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: 'global' });
     if (goal) {
       goal.targetNetResult = parseFloat(targetNetResult);
       await goal.save();
     } else {
       goal = new MonthlyGoal({
         userId: req.user.id,
-        month: monthFormatted,
+        month: 'global',
         targetNetResult: parseFloat(targetNetResult)
       });
       await goal.save();
     }
     res.json(goal);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao salvar meta do mês: ' + error.message });
+    res.status(500).json({ error: 'Erro ao salvar meta: ' + error.message });
   }
 });
 
