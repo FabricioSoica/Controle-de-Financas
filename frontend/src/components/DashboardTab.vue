@@ -398,7 +398,7 @@ const getCardUsagePercentage = (cardTotal) => {
 
           <!-- Custom Credit Card selection and Installments (Only if type === 'card') -->
           <div v-if="transType === 'card'" class="form-group">
-            <div v-if="!isEditingTrans" class="form-row-2">
+            <div v-if="!isEditingTrans" class="form-row-2" style="align-items: end;">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Qual Cartão de Crédito?</label>
                 <input 
