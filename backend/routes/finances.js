@@ -1,0 +1,303 @@
+const express = require('express');
+const Transaction = require('../models/Transaction');
+const MonthlyGoal = require('../models/MonthlyGoal');
+const authMiddleware = require('../middleware/auth');
+
+const router = express.Router();
+
+// Apply authMiddleware to all finance routes
+router.use(authMiddleware);
+
+// Helper to add months to a MM/YYYY string
+const addMonths = (monthYearStr, monthsToAdd) => {
+  const [monthStr, yearStr] = monthYearStr.split('/');
+  let month = parseInt(monthStr, 10);
+  let year = parseInt(yearStr, 10);
+
+  month += monthsToAdd;
+  while (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+  
+  return `${String(month).padStart(2, '0')}/${year}`;
+};
+
+// Get annual evolution summary (last 12 months)
+router.get('/summary/evolution', async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ userId: req.user.id });
+    const monthlyData = {};
+
+    transactions.forEach(t => {
+      const m = t.month;
+      if (!m) return;
+      
+      const [monthStr, yearStr] = m.split('/');
+      const sortKey = `${yearStr}-${monthStr}`;
+      
+      if (!monthlyData[sortKey]) {
+        monthlyData[sortKey] = {
+          monthLabel: m,
+          sortKey,
+          income: 0,
+          card: 0,
+          fixed: 0,
+          variable: 0
+        };
+      }
+      
+      if (t.type === 'income') monthlyData[sortKey].income += t.amount;
+      else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
+      else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
+      else if (t.type === 'variable') monthlyData[sortKey].variable += t.amount;
+    });
+
+    const result = Object.values(monthlyData)
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .slice(-12); // Keep only last 12 months
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar dados de evolução: ' + error.message });
+  }
+});
+
+// Get global goal for the user
+router.get('/goal', async (req, res) => {
+  try {
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: 'global' });
+    if (!goal) {
+      return res.json({ targetNetResult: 0 });
+    }
+    res.json(goal);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar meta: ' + error.message });
+  }
+});
+
+// Set or update global goal for the user
+router.post('/goal', async (req, res) => {
+  try {
+    const { targetNetResult } = req.body;
+    if (targetNetResult === undefined) {
+      return res.status(400).json({ error: 'Campo obrigatório ausente: valor da meta.' });
+    }
+    
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: 'global' });
+    if (goal) {
+      goal.targetNetResult = parseFloat(targetNetResult);
+      await goal.save();
+    } else {
+      goal = new MonthlyGoal({
+        userId: req.user.id,
+        month: 'global',
+        targetNetResult: parseFloat(targetNetResult)
+      });
+      await goal.save();
+    }
+    res.json(goal);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao salvar meta: ' + error.message });
+  }
+});
+
+// Get all transactions for a specific month (e.g. "06/2026")
+router.get('/:month', async (req, res) => {
+  try {
+    const month = req.params.month.replace(/[-_]/g, '/');
+    const transactions = await Transaction.find({ 
+      userId: req.user.id, 
+      month 
+    }).sort({ createdAt: -1 });
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar lançamentos: ' + error.message });
+  }
+});
+
+// Add a transaction (with optional support for installments)
+router.post('/', async (req, res) => {
+  try {
+    const { description, amount, type, month, info, cardName, installments } = req.body;
+    if (!description || amount === undefined || !type || !month) {
+      return res.status(400).json({ error: 'Campos obrigatórios ausentes: descrição, valor, tipo e mês são obrigatórios.' });
+    }
+    
+    // For card types, set cardName (fallback to description if empty)
+    let finalCardName = '';
+    if (type === 'card') {
+      finalCardName = cardName && cardName.trim() ? cardName.trim() : description.trim();
+    }
+
+    const monthFormatted = month.replace(/[-_]/g, '/');
+
+    // If type === 'card' and installments is a valid number greater than 1
+    if (type === 'card' && installments && parseInt(installments, 10) > 1) {
+      const totalInstallments = parseInt(installments, 10);
+      const totalAmount = parseFloat(amount);
+      const installmentAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
+      const remainder = Math.round((totalAmount - (installmentAmount * totalInstallments)) * 100);
+
+      const savedTransactions = [];
+
+      for (let i = 1; i <= totalInstallments; i++) {
+        let currentAmount = installmentAmount;
+        if (i <= remainder) {
+          currentAmount += 0.01;
+        }
+        currentAmount = parseFloat(currentAmount.toFixed(2));
+
+        const targetMonth = addMonths(monthFormatted, i - 1);
+        const installmentDesc = `${description.trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
+
+        const newTransaction = new Transaction({
+          userId: req.user.id,
+          description: installmentDesc,
+          amount: currentAmount,
+          type,
+          cardName: finalCardName,
+          month: targetMonth,
+          info: info || ''
+        });
+
+        const saved = await newTransaction.save();
+        savedTransactions.push(saved);
+      }
+
+      return res.status(201).json(savedTransactions);
+    }
+
+    // Normal non-installment flow
+    const newTransaction = new Transaction({
+      userId: req.user.id,
+      description,
+      amount: parseFloat(amount),
+      type,
+      cardName: finalCardName,
+      month: monthFormatted,
+      info: info || ''
+    });
+    
+    const savedTransaction = await newTransaction.save();
+    res.status(201).json(savedTransaction);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar lançamento: ' + error.message });
+  }
+});
+
+// Update a transaction
+router.put('/:id', async (req, res) => {
+  try {
+    const { description, amount, type, month, info, cardName, installments } = req.body;
+    
+    // Fetch the original transaction to check its status
+    const originalTrans = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!originalTrans) {
+      return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
+    }
+
+    const monthFormatted = (month || originalTrans.month).replace(/[-_]/g, '/');
+    const targetType = type || originalTrans.type;
+
+    // If type is card and installments is specified as > 1
+    if (targetType === 'card' && installments && parseInt(installments, 10) > 1) {
+      const totalInstallments = parseInt(installments, 10);
+      const totalAmount = parseFloat(amount || originalTrans.amount);
+      const installmentAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
+      const remainder = Math.round((totalAmount - (installmentAmount * totalInstallments)) * 100);
+
+      const finalCardName = cardName && cardName.trim() ? cardName.trim() : (description || originalTrans.description).trim();
+
+      // Update the first transaction (the one being edited)
+      let firstAmount = installmentAmount;
+      if (1 <= remainder) {
+        firstAmount += 0.01;
+      }
+      firstAmount = parseFloat(firstAmount.toFixed(2));
+      const firstDesc = `${(description || originalTrans.description).trim()} (01/${String(totalInstallments).padStart(2, '0')})`;
+
+      originalTrans.description = firstDesc;
+      originalTrans.amount = firstAmount;
+      originalTrans.type = 'card';
+      originalTrans.cardName = finalCardName;
+      originalTrans.month = monthFormatted;
+      originalTrans.info = info !== undefined ? info : originalTrans.info;
+      
+      const updatedFirst = await originalTrans.save();
+      const savedTransactions = [updatedFirst];
+
+      // Create N - 1 new transactions for subsequent months
+      for (let i = 2; i <= totalInstallments; i++) {
+        let currentAmount = installmentAmount;
+        if (i <= remainder) {
+          currentAmount += 0.01;
+        }
+        currentAmount = parseFloat(currentAmount.toFixed(2));
+
+        const targetMonth = addMonths(monthFormatted, i - 1);
+        const installmentDesc = `${(description || originalTrans.description).trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
+
+        const newTransaction = new Transaction({
+          userId: req.user.id,
+          description: installmentDesc,
+          amount: currentAmount,
+          type: 'card',
+          cardName: finalCardName,
+          month: targetMonth,
+          info: info !== undefined ? info : (originalTrans.info || '')
+        });
+
+        const saved = await newTransaction.save();
+        savedTransactions.push(saved);
+      }
+
+      return res.json(savedTransactions);
+    }
+
+    // Normal non-installment update flow
+    const updatedFields = {};
+    if (description !== undefined) updatedFields.description = description;
+    if (amount !== undefined) updatedFields.amount = parseFloat(amount);
+    if (type !== undefined) updatedFields.type = type;
+    if (month !== undefined) updatedFields.month = month.replace(/[-_]/g, '/');
+    if (info !== undefined) updatedFields.info = info;
+    
+    if (targetType === 'card') {
+      if (cardName !== undefined) {
+        updatedFields.cardName = cardName.trim();
+      } else if (description !== undefined) {
+        updatedFields.cardName = description.trim();
+      }
+    } else if (type !== undefined && type !== 'card') {
+      updatedFields.cardName = '';
+    }
+
+    const updatedTransaction = await Transaction.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { $set: updatedFields },
+      { new: true, runValidators: true }
+    );
+    res.json(updatedTransaction);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar lançamento: ' + error.message });
+  }
+});
+
+// Delete a transaction
+router.delete('/:id', async (req, res) => {
+  try {
+    const deletedTransaction = await Transaction.findOneAndDelete({ 
+      _id: req.params.id, 
+      userId: req.user.id 
+    });
+    if (!deletedTransaction) {
+      return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
+    }
+    res.json({ message: 'Lançamento deletado com sucesso.', id: req.params.id });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar lançamento: ' + error.message });
+  }
+});
+
+module.exports = router;
