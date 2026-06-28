@@ -373,7 +373,73 @@ app.post('/api/finances', authMiddleware, async (req, res) => {
 // Update a transaction
 app.put('/api/finances/:id', authMiddleware, async (req, res) => {
   try {
-    const { description, amount, type, month, info, cardName } = req.body;
+    const { description, amount, type, month, info, cardName, installments } = req.body;
+    
+    // Fetch the original transaction to check its status
+    const originalTrans = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!originalTrans) {
+      return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
+    }
+
+    const monthFormatted = (month || originalTrans.month).replace(/[-_]/g, '/');
+    const targetType = type || originalTrans.type;
+
+    // If type is card and installments is specified as > 1
+    if (targetType === 'card' && installments && parseInt(installments, 10) > 1) {
+      const totalInstallments = parseInt(installments, 10);
+      const totalAmount = parseFloat(amount || originalTrans.amount);
+      const installmentAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
+      const remainder = Math.round((totalAmount - (installmentAmount * totalInstallments)) * 100);
+
+      const finalCardName = cardName && cardName.trim() ? cardName.trim() : (description || originalTrans.description).trim();
+
+      // Update the first transaction (the one being edited)
+      let firstAmount = installmentAmount;
+      if (1 <= remainder) {
+        firstAmount += 0.01;
+      }
+      firstAmount = parseFloat(firstAmount.toFixed(2));
+      const firstDesc = `${(description || originalTrans.description).trim()} (01/${String(totalInstallments).padStart(2, '0')})`;
+
+      originalTrans.description = firstDesc;
+      originalTrans.amount = firstAmount;
+      originalTrans.type = 'card';
+      originalTrans.cardName = finalCardName;
+      originalTrans.month = monthFormatted;
+      originalTrans.info = info !== undefined ? info : originalTrans.info;
+      
+      const updatedFirst = await originalTrans.save();
+      const savedTransactions = [updatedFirst];
+
+      // Create N - 1 new transactions for subsequent months
+      for (let i = 2; i <= totalInstallments; i++) {
+        let currentAmount = installmentAmount;
+        if (i <= remainder) {
+          currentAmount += 0.01;
+        }
+        currentAmount = parseFloat(currentAmount.toFixed(2));
+
+        const targetMonth = addMonths(monthFormatted, i - 1);
+        const installmentDesc = `${(description || originalTrans.description).trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
+
+        const newTransaction = new Transaction({
+          userId: req.user.id,
+          description: installmentDesc,
+          amount: currentAmount,
+          type: 'card',
+          cardName: finalCardName,
+          month: targetMonth,
+          info: info !== undefined ? info : (originalTrans.info || '')
+        });
+
+        const saved = await newTransaction.save();
+        savedTransactions.push(saved);
+      }
+
+      return res.json(savedTransactions);
+    }
+
+    // Normal non-installment update flow
     const updatedFields = {};
     if (description !== undefined) updatedFields.description = description;
     if (amount !== undefined) updatedFields.amount = parseFloat(amount);
@@ -381,15 +447,13 @@ app.put('/api/finances/:id', authMiddleware, async (req, res) => {
     if (month !== undefined) updatedFields.month = month.replace(/[-_]/g, '/');
     if (info !== undefined) updatedFields.info = info;
     
-    if (type === 'card' || (type === undefined && cardName !== undefined)) {
-      // Handle cardName updates
+    if (targetType === 'card') {
       if (cardName !== undefined) {
         updatedFields.cardName = cardName.trim();
       } else if (description !== undefined) {
         updatedFields.cardName = description.trim();
       }
     } else if (type !== undefined && type !== 'card') {
-      // Clear cardName if changing away from card type
       updatedFields.cardName = '';
     }
 
@@ -398,9 +462,6 @@ app.put('/api/finances/:id', authMiddleware, async (req, res) => {
       { $set: updatedFields },
       { new: true, runValidators: true }
     );
-    if (!updatedTransaction) {
-      return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
-    }
     res.json(updatedTransaction);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar lançamento: ' + error.message });

@@ -256,7 +256,7 @@ const saveTransaction = async () => {
     info: transInfo.value
   };
 
-  if (transType.value === 'card' && transInstallments.value > 1 && !isEditingTrans.value) {
+  if (transType.value === 'card' && transInstallments.value > 1) {
     payload.installments = parseInt(transInstallments.value, 10);
   }
 
@@ -624,7 +624,7 @@ const getCardUsagePercentage = (cardTotal) => {
 
           <!-- Custom Credit Card selection and Installments (Only if type === 'card') -->
           <div v-if="transType === 'card'" class="form-group">
-            <div v-if="!isEditingTrans" class="form-row-2" style="align-items: end;">
+            <div class="form-row-2" style="align-items: end;">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Qual Cartão de Crédito?</label>
                 <input 
@@ -651,21 +651,6 @@ const getCardUsagePercentage = (cardTotal) => {
                   required
                 />
               </div>
-            </div>
-            <div v-else class="form-group" style="margin-bottom: 0;">
-              <label class="form-label">Qual Cartão de Crédito?</label>
-              <input 
-                type="text" 
-                v-model="transCardName" 
-                placeholder="Ex: Santander" 
-                class="form-input"
-                list="card-names-list-comp"
-                required
-              />
-              <!-- HTML5 native autocomplete based on previous items -->
-              <datalist id="card-names-list-comp">
-                <option v-for="card in uniqueCardNames" :value="card" :key="card" />
-              </datalist>
             </div>
           </div>
 
