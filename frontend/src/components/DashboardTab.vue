@@ -391,7 +391,7 @@ const getCardUsagePercentage = (cardTotal) => {
 <template>
   <div>
     <!-- Month Picker -->
-    <div class="filter-bar">
+    <div class="filter-bar" style="position: relative; z-index: 50;">
       <div class="month-picker-container">
         <span class="month-picker-label"><i class="fa-solid fa-calendar-days"></i> Competência:</span>
         <input 
