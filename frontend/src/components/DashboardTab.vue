@@ -26,6 +26,7 @@ const transType = ref('card'); // income, fixed, card, variable
 const transCardName = ref('');
 const transInfo = ref('');
 const transInstallments = ref(1);
+const targetNetResult = ref(0);
 const isEditingTrans = ref(false);
 
 // Collapsible Credit Cards State
@@ -61,11 +62,67 @@ onMounted(() => {
   const year = now.getFullYear();
   selectedMonth.value = `${year}-${month}`;
   fetchTransactions();
+  fetchMonthlyGoal();
 });
 
 // Watch month changes to reload transactions
 watch(selectedMonth, () => {
   fetchTransactions();
+  fetchMonthlyGoal();
+});
+
+const fetchMonthlyGoal = async () => {
+  if (!props.token) return;
+  try {
+    const formattedMonth = getMonthYearString(selectedMonth.value);
+    const urlMonth = formattedMonth.replace('/', '-');
+    const res = await fetch(`${props.apiUrl}/api/finances/goal/${urlMonth}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Falha ao buscar meta do mês');
+    const data = await res.json();
+    targetNetResult.value = data.targetNetResult || 0;
+  } catch (error) {
+    console.error(error.message);
+  }
+};
+
+const changeMonthlyGoal = async () => {
+  const input = prompt(
+    `Defina a meta de Resultado Líquido (Investimentos) para ${getMonthYearString(selectedMonth.value)} (R$):`,
+    targetNetResult.value || ''
+  );
+  if (input === null) return;
+  
+  const val = parseFloat(input);
+  if (isNaN(val) || val < 0) {
+    emit('toast', { message: 'Por favor, insira um valor válido maior ou igual a zero.', type: 'error' });
+    return;
+  }
+
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/goal`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        month: getMonthYearString(selectedMonth.value),
+        targetNetResult: val
+      })
+    });
+    if (!res.ok) throw new Error('Não foi possível salvar a meta');
+    const data = await res.json();
+    targetNetResult.value = data.targetNetResult;
+    emit('toast', { message: 'Meta de investimentos atualizada com sucesso!', type: 'success' });
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  }
+};
+
+const goalPercentage = computed(() => {
+  if (targetNetResult.value <= 0) return 0;
+  if (netPostFixed.value <= 0) return 0;
+  const pct = (netPostFixed.value / targetNetResult.value) * 100;
+  return Math.round(pct);
 });
 
 // ==========================================
@@ -305,8 +362,29 @@ const getCardUsagePercentage = (cardTotal) => {
           {{ formatCurrency(netPostFixed) }}
         </div>
         <div class="card-sub-calc">
-          <span>Línguido Inicial:</span>
+          <span>Líquido Inicial:</span>
           <span class="sub-calc-val">{{ formatCurrency(netIncome) }}</span>
+        </div>
+        
+        <!-- Net Goal Section -->
+        <div class="card-goal-section" style="margin-top: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: left; width: 100%;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-secondary);">
+            <span>Meta de Investimento:</span>
+            <button @click="changeMonthlyGoal" class="btn-edit-goal" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 0.75rem; padding: 0; font-weight: 600; display: flex; align-items: center; gap: 0.25rem;" title="Definir Meta" type="button">
+              <i class="fa-solid fa-pen-to-square"></i> {{ targetNetResult > 0 ? formatCurrency(targetNetResult) : 'Definir' }}
+            </button>
+          </div>
+          
+          <div v-if="targetNetResult > 0" style="margin-top: 0.4rem;">
+            <div class="goal-progress-bar-container" style="background: rgba(255,255,255,0.05); height: 6px; border-radius: 3px; overflow: hidden; position: relative;">
+              <div class="goal-progress-bar" :style="{ width: Math.min(goalPercentage, 100) + '%', background: goalPercentage >= 100 ? 'var(--color-success)' : 'linear-gradient(90deg, var(--color-primary), #a855f7)' }" style="height: 100%; transition: width 0.5s ease;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); margin-top: 0.25rem;">
+              <span>{{ goalPercentage }}% atingido</span>
+              <span v-if="netPostFixed >= targetNetResult" style="color: var(--color-success); font-weight: bold;"><i class="fa-solid fa-circle-check"></i> Meta Atingida</span>
+              <span v-else>Falta {{ formatCurrency(Math.max(targetNetResult - netPostFixed, 0)) }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

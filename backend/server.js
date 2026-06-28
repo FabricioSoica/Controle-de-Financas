@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const Transaction = require('./models/Transaction');
 const ShoppingItem = require('./models/ShoppingItem');
 const User = require('./models/User');
+const MonthlyGoal = require('./models/MonthlyGoal');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -215,6 +216,47 @@ app.get('/api/finances/summary/evolution', authMiddleware, async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar dados de evolução: ' + error.message });
+  }
+});
+
+// Get goal for a specific month
+app.get('/api/finances/goal/:month', authMiddleware, async (req, res) => {
+  try {
+    const month = req.params.month.replace(/[-_]/g, '/');
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month });
+    if (!goal) {
+      return res.json({ month, targetNetResult: 0 });
+    }
+    res.json(goal);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar meta do mês: ' + error.message });
+  }
+});
+
+// Set or update goal for a specific month
+app.post('/api/finances/goal', authMiddleware, async (req, res) => {
+  try {
+    const { month, targetNetResult } = req.body;
+    if (!month || targetNetResult === undefined) {
+      return res.status(400).json({ error: 'Campos obrigatórios ausentes: mês e valor da meta.' });
+    }
+    const monthFormatted = month.replace(/[-_]/g, '/');
+    
+    let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: monthFormatted });
+    if (goal) {
+      goal.targetNetResult = parseFloat(targetNetResult);
+      await goal.save();
+    } else {
+      goal = new MonthlyGoal({
+        userId: req.user.id,
+        month: monthFormatted,
+        targetNetResult: parseFloat(targetNetResult)
+      });
+      await goal.save();
+    }
+    res.json(goal);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao salvar meta do mês: ' + error.message });
   }
 });
 
