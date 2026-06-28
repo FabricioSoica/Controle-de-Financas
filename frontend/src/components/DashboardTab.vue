@@ -29,6 +29,7 @@ const transInstallments = ref(1);
 const targetNetResult = ref(0);
 const showGoalModal = ref(false);
 const tempGoalValue = ref('');
+const annualEvolution = ref([]);
 const isEditingTrans = ref(false);
 
 // Collapsible Credit Cards State
@@ -65,6 +66,7 @@ onMounted(() => {
   selectedMonth.value = `${year}-${month}`;
   fetchTransactions();
   fetchMonthlyGoal();
+  fetchAnnualEvolution();
 });
 
 // Watch month changes to reload transactions
@@ -81,6 +83,19 @@ const fetchMonthlyGoal = async () => {
     if (!res.ok) throw new Error('Falha ao buscar meta');
     const data = await res.json();
     targetNetResult.value = data.targetNetResult || 0;
+  } catch (error) {
+    console.error(error.message);
+  }
+};
+
+const fetchAnnualEvolution = async () => {
+  if (!props.token) return;
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/summary/evolution`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Falha ao buscar evolução anual');
+    annualEvolution.value = await res.json();
   } catch (error) {
     console.error(error.message);
   }
@@ -116,11 +131,63 @@ const saveMonthlyGoal = async () => {
   }
 };
 
+const exportToCSV = () => {
+  if (transactions.value.length === 0) {
+    emit('toast', { message: 'Não há lançamentos cadastrados neste mês para exportar.', type: 'info' });
+    return;
+  }
+
+  const headers = ['Descrição', 'Valor (R$)', 'Tipo', 'Cartão', 'Observação', 'Data de Criação'];
+  const rows = transactions.value.map(t => {
+    let typePT = '';
+    if (t.type === 'income') typePT = 'Receita';
+    else if (t.type === 'card') typePT = 'Cartão';
+    else if (t.type === 'fixed') typePT = 'Fixo';
+    else if (t.type === 'variable') typePT = 'Variável';
+
+    return [
+      t.description,
+      t.amount.toString().replace('.', ','),
+      typePT,
+      t.cardName || '',
+      t.info || '',
+      new Date(t.createdAt).toLocaleDateString('pt-BR')
+    ];
+  });
+
+  const csvContent = [
+    headers.join(';'),
+    ...rows.map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const formattedMonth = getMonthYearString(selectedMonth.value).replace('/', '-');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `Financas_${formattedMonth}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  emit('toast', { message: 'Planilha exportada com sucesso!', type: 'success' });
+};
+
 const goalPercentage = computed(() => {
   if (targetNetResult.value <= 0) return 0;
   if (netPostFixed.value <= 0) return 0;
   const pct = (netPostFixed.value / targetNetResult.value) * 100;
   return Math.round(pct);
+});
+
+const cumulativeYearNetResult = computed(() => {
+  const currentYearStr = new Date().getFullYear().toString();
+  return annualEvolution.value
+    .filter(item => item.sortKey && item.sortKey.startsWith(currentYearStr))
+    .reduce((sum, item) => {
+      const netResult = item.income - (item.card + item.fixed + item.variable);
+      return sum + netResult;
+    }, 0);
 });
 
 // ==========================================
@@ -202,6 +269,7 @@ const saveTransaction = async () => {
     });
     resetTransForm();
     fetchTransactions();
+    fetchAnnualEvolution();
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   }
@@ -228,6 +296,7 @@ const deleteTransaction = async (id) => {
     if (!res.ok) throw new Error('Erro ao deletar lançamento');
     emit('toast', { message: 'Lançamento excluído com sucesso.', type: 'success' });
     fetchTransactions();
+    fetchAnnualEvolution();
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   }
@@ -315,6 +384,15 @@ const getCardUsagePercentage = (cardTotal) => {
         >
           Mês Atual
         </button>
+        <button 
+          class="btn-today" 
+          @click="exportToCSV"
+          type="button"
+          style="display: flex; align-items: center; gap: 0.4rem;"
+          title="Exportar lançamentos para planilha Excel"
+        >
+          <i class="fa-solid fa-file-excel" style="color: var(--color-success);"></i> Exportar Mês
+        </button>
       </div>
       <div>
         <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
@@ -383,6 +461,18 @@ const getCardUsagePercentage = (cardTotal) => {
               <span v-else>Falta {{ formatCurrency(Math.max(targetNetResult - netPostFixed, 0)) }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Cumulative YTD Card -->
+      <div class="summary-card card-cumulative">
+        <span class="card-icon"><i class="fa-solid fa-piggy-bank"></i></span>
+        <div class="card-title" style="color: var(--color-success);">Acumulado do Ano</div>
+        <div class="card-value" :class="cumulativeYearNetResult >= 0 ? 'text-success' : 'text-danger'">
+          {{ formatCurrency(cumulativeYearNetResult) }}
+        </div>
+        <div class="card-sub-calc">
+          Investido em {{ new Date().getFullYear() }}
         </div>
       </div>
     </div>
@@ -745,5 +835,15 @@ const getCardUsagePercentage = (cardTotal) => {
 @keyframes scaleIn {
   from { transform: scale(0.9) translateY(10px); opacity: 0; }
   to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.card-cumulative::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, var(--color-success), #10b981);
 }
 </style>
