@@ -25,6 +25,7 @@ const transAmount = ref('');
 const transType = ref('card'); // income, fixed, card, variable
 const transCardName = ref('');
 const transInfo = ref('');
+const transInstallments = ref(1);
 const isEditingTrans = ref(false);
 
 // Collapsible Credit Cards State
@@ -111,6 +112,10 @@ const saveTransaction = async () => {
     info: transInfo.value
   };
 
+  if (transType.value === 'card' && transInstallments.value > 1 && !isEditingTrans.value) {
+    payload.installments = parseInt(transInstallments.value, 10);
+  }
+
   try {
     let res;
     if (isEditingTrans.value && transId.value) {
@@ -133,7 +138,11 @@ const saveTransaction = async () => {
     }
 
     emit('toast', { 
-      message: isEditingTrans.value ? 'Lançamento atualizado!' : 'Lançamento adicionado com sucesso!',
+      message: isEditingTrans.value 
+        ? 'Lançamento atualizado!' 
+        : (transType.value === 'card' && transInstallments.value > 1 
+            ? `Compra parcelada em ${transInstallments.value}x adicionada com sucesso!` 
+            : 'Lançamento adicionado com sucesso!'),
       type: 'success' 
     });
     resetTransForm();
@@ -150,6 +159,7 @@ const editTransaction = (t) => {
   transType.value = t.type;
   transCardName.value = t.cardName || '';
   transInfo.value = t.info || '';
+  transInstallments.value = 1;
   isEditingTrans.value = true;
 };
 
@@ -175,6 +185,7 @@ const resetTransForm = () => {
   transType.value = 'card';
   transCardName.value = '';
   transInfo.value = '';
+  transInstallments.value = 1;
   isEditingTrans.value = false;
 };
 
@@ -385,21 +396,51 @@ const getCardUsagePercentage = (cardTotal) => {
             </div>
           </div>
 
-          <!-- Custom Credit Card selection (Only if type === 'card') -->
+          <!-- Custom Credit Card selection and Installments (Only if type === 'card') -->
           <div v-if="transType === 'card'" class="form-group">
-            <label class="form-label">Qual Cartão de Crédito?</label>
-            <input 
-              type="text" 
-              v-model="transCardName" 
-              placeholder="Ex: Santander, Mercado Pago" 
-              class="form-input"
-              list="card-names-list-comp"
-              required
-            />
-            <!-- HTML5 native autocomplete based on previous items -->
-            <datalist id="card-names-list-comp">
-              <option v-for="card in uniqueCardNames" :value="card" :key="card" />
-            </datalist>
+            <div v-if="!isEditingTrans" class="form-row-2">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Qual Cartão de Crédito?</label>
+                <input 
+                  type="text" 
+                  v-model="transCardName" 
+                  placeholder="Ex: Santander" 
+                  class="form-input"
+                  list="card-names-list-comp"
+                  required
+                />
+                <!-- HTML5 native autocomplete based on previous items -->
+                <datalist id="card-names-list-comp">
+                  <option v-for="card in uniqueCardNames" :value="card" :key="card" />
+                </datalist>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Parcelas (x)</label>
+                <input 
+                  type="number" 
+                  v-model="transInstallments" 
+                  min="1" 
+                  max="72"
+                  class="form-input"
+                  required
+                />
+              </div>
+            </div>
+            <div v-else class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">Qual Cartão de Crédito?</label>
+              <input 
+                type="text" 
+                v-model="transCardName" 
+                placeholder="Ex: Santander" 
+                class="form-input"
+                list="card-names-list-comp"
+                required
+              />
+              <!-- HTML5 native autocomplete based on previous items -->
+              <datalist id="card-names-list-comp">
+                <option v-for="card in uniqueCardNames" :value="card" :key="card" />
+              </datalist>
+            </div>
           </div>
 
           <div class="form-group">

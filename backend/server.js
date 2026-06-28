@@ -232,10 +232,25 @@ app.get('/api/finances/:month', authMiddleware, async (req, res) => {
   }
 });
 
-// Add a transaction
+// Helper to add months to a MM/YYYY string
+const addMonths = (monthYearStr, monthsToAdd) => {
+  const [monthStr, yearStr] = monthYearStr.split('/');
+  let month = parseInt(monthStr, 10);
+  let year = parseInt(yearStr, 10);
+
+  month += monthsToAdd;
+  while (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+  
+  return `${String(month).padStart(2, '0')}/${year}`;
+};
+
+// Add a transaction (with optional support for installments)
 app.post('/api/finances', authMiddleware, async (req, res) => {
   try {
-    const { description, amount, type, month, info, cardName } = req.body;
+    const { description, amount, type, month, info, cardName, installments } = req.body;
     if (!description || amount === undefined || !type || !month) {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: descrição, valor, tipo e mês são obrigatórios.' });
     }
@@ -246,13 +261,52 @@ app.post('/api/finances', authMiddleware, async (req, res) => {
       finalCardName = cardName && cardName.trim() ? cardName.trim() : description.trim();
     }
 
+    const monthFormatted = month.replace(/[-_]/g, '/');
+
+    // If type === 'card' and installments is a valid number greater than 1
+    if (type === 'card' && installments && parseInt(installments, 10) > 1) {
+      const totalInstallments = parseInt(installments, 10);
+      const totalAmount = parseFloat(amount);
+      const installmentAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
+      const remainder = Math.round((totalAmount - (installmentAmount * totalInstallments)) * 100);
+
+      const savedTransactions = [];
+
+      for (let i = 1; i <= totalInstallments; i++) {
+        let currentAmount = installmentAmount;
+        if (i <= remainder) {
+          currentAmount += 0.01;
+        }
+        currentAmount = parseFloat(currentAmount.toFixed(2));
+
+        const targetMonth = addMonths(monthFormatted, i - 1);
+        const installmentDesc = `${description.trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
+
+        const newTransaction = new Transaction({
+          userId: req.user.id,
+          description: installmentDesc,
+          amount: currentAmount,
+          type,
+          cardName: finalCardName,
+          month: targetMonth,
+          info: info || ''
+        });
+
+        const saved = await newTransaction.save();
+        savedTransactions.push(saved);
+      }
+
+      return res.status(201).json(savedTransactions);
+    }
+
+    // Normal non-installment flow
     const newTransaction = new Transaction({
       userId: req.user.id,
       description,
       amount: parseFloat(amount),
       type,
       cardName: finalCardName,
-      month: month.replace(/[-_]/g, '/'),
+      month: monthFormatted,
       info: info || ''
     });
     
