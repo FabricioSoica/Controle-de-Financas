@@ -309,20 +309,50 @@ const editTransaction = (t) => {
   isEditingTrans.value = true;
 };
 
-const deleteTransaction = async (id) => {
-  if (!confirm('Deseja realmente excluir este lançamento?')) return;
+const showDeleteModal = ref(false);
+const transactionToDelete = ref(null);
+
+const deleteTransaction = (t) => {
+  if (t.type === 'card' && t.description.includes(' (')) {
+    transactionToDelete.value = t;
+    showDeleteModal.value = true;
+  } else {
+    if (confirm('Deseja realmente excluir este lançamento?')) {
+      executeDelete(t._id, false);
+    }
+  }
+};
+
+const executeDelete = async (id, deleteAll) => {
   try {
-    const res = await fetch(`${props.apiUrl}/api/finances/${id}`, {
+    const res = await fetch(`${props.apiUrl}/api/finances/${id}?deleteAll=${deleteAll}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Erro ao deletar lançamento');
-    emit('toast', { message: 'Lançamento excluído com sucesso.', type: 'success' });
+    emit('toast', { 
+      message: deleteAll 
+        ? 'Todas as parcelas foram excluídas com sucesso.' 
+        : 'Lançamento excluído com sucesso.', 
+      type: 'success' 
+    });
     fetchTransactions();
     fetchAnnualEvolution();
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   }
+};
+
+const confirmDelete = (deleteAll) => {
+  if (transactionToDelete.value) {
+    executeDelete(transactionToDelete.value._id, deleteAll);
+  }
+  closeDeleteModal();
+};
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false;
+  transactionToDelete.value = null;
 };
 
 const resetTransForm = () => {
@@ -801,7 +831,7 @@ const getCardUsagePercentage = (cardTotal) => {
                     <span class="item-obs">{{ t.info }}</span>
                     <div class="item-actions">
                       <button class="action-btn btn-edit" @click="editTransaction(t)"><i class="fa-solid fa-pen"></i></button>
-                      <button class="action-btn btn-delete" @click="deleteTransaction(t._id)"><i class="fa-solid fa-trash"></i></button>
+                      <button class="action-btn btn-delete" @click="deleteTransaction(t)"><i class="fa-solid fa-trash"></i></button>
                     </div>
                   </div>
                 </div>
@@ -830,7 +860,7 @@ const getCardUsagePercentage = (cardTotal) => {
                     <span class="item-obs">{{ t.info }}</span>
                     <div class="item-actions">
                       <button class="action-btn btn-edit" @click="editTransaction(t)"><i class="fa-solid fa-pen"></i></button>
-                      <button class="action-btn btn-delete" @click="deleteTransaction(t._id)"><i class="fa-solid fa-trash"></i></button>
+                      <button class="action-btn btn-delete" @click="deleteTransaction(t)"><i class="fa-solid fa-trash"></i></button>
                     </div>
                   </div>
                 </div>
@@ -854,7 +884,7 @@ const getCardUsagePercentage = (cardTotal) => {
                     <span class="item-obs">{{ t.info }}</span>
                     <div class="item-actions">
                       <button class="action-btn btn-edit" @click="editTransaction(t)"><i class="fa-solid fa-pen"></i></button>
-                      <button class="action-btn btn-delete" @click="deleteTransaction(t._id)"><i class="fa-solid fa-trash"></i></button>
+                      <button class="action-btn btn-delete" @click="deleteTransaction(t)"><i class="fa-solid fa-trash"></i></button>
                     </div>
                   </div>
                 </div>
@@ -878,7 +908,7 @@ const getCardUsagePercentage = (cardTotal) => {
                     <span class="item-obs">{{ t.info }}</span>
                     <div class="item-actions">
                       <button class="action-btn btn-edit" @click="editTransaction(t)"><i class="fa-solid fa-pen"></i></button>
-                      <button class="action-btn btn-delete" @click="deleteTransaction(t._id)"><i class="fa-solid fa-trash"></i></button>
+                      <button class="action-btn btn-delete" @click="deleteTransaction(t)"><i class="fa-solid fa-trash"></i></button>
                     </div>
                   </div>
                 </div>
@@ -930,6 +960,54 @@ const getCardUsagePercentage = (cardTotal) => {
           <button @click="showGoalModal = false" class="btn btn-secondary" type="button" style="min-height: 38px;">Cancelar</button>
           <button @click="saveMonthlyGoal" class="btn btn-primary" type="button" style="min-height: 38px;">
             <i class="fa-solid fa-check"></i> Salvar Meta
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beautiful Custom Modal for Confirming Transaction Deletion -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
+      <div class="modal-card" style="max-width: 440px;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem; color: var(--text-primary);">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-danger);"></i>
+            Excluir Compra Parcelada
+          </h3>
+          <button @click="closeDeleteModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body" style="padding: 1.25rem 0 1.5rem 0; text-align: left;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+            Este lançamento faz parte de uma compra parcelada no cartão:
+          </p>
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1.25rem;">
+            <div style="font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 0.25rem;">
+              {{ transactionToDelete?.description }}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--color-danger); font-weight: 600; display: flex; align-items: center; gap: 0.35rem;">
+              <span>💳 {{ transactionToDelete?.cardName || 'Geral' }}</span>
+              <span>•</span>
+              <span>{{ formatCurrency(transactionToDelete?.amount) }}</span>
+            </div>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+            Como você deseja excluir esta compra?
+          </p>
+        </div>
+        
+        <div class="modal-footer" style="display: flex; flex-direction: column; gap: 0.65rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <button @click="confirmDelete(false)" class="btn btn-secondary" type="button" style="min-height: 42px; width: 100%; justify-content: center; background: rgba(255,255,255,0.03); border-color: var(--border-color); color: #fff;">
+            <i class="fa-solid fa-calendar-minus" style="margin-right: 0.5rem; color: var(--color-primary);"></i>
+            Excluir Apenas do Mês Atual
+          </button>
+          <button @click="confirmDelete(true)" class="btn btn-danger" type="button" style="min-height: 42px; width: 100%; justify-content: center;">
+            <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i>
+            Excluir de Todos os Meses
+          </button>
+          <button @click="closeDeleteModal" class="btn btn-secondary" type="button" style="min-height: 38px; width: 100%; justify-content: center; margin-top: 0.25rem;">
+            Cancelar
           </button>
         </div>
       </div>
