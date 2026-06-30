@@ -378,6 +378,15 @@ const getPreviousMonth = (ym) => {
   return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 };
 
+const changeMonth = (offset) => {
+  if (!selectedMonth.value) return;
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  const date = new Date(year, month - 1 + offset, 15);
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+  selectedMonth.value = `${newYear}-${newMonth}`;
+};
+
 const showImportModal = ref(false);
 const prevMonthTransactions = ref([]);
 const selectedImportIds = ref([]);
@@ -584,18 +593,36 @@ const getCardUsagePercentage = (cardTotal) => {
     <div class="filter-bar" style="position: relative; z-index: 50;">
       <div class="month-picker-container">
         <span class="month-picker-label"><i class="fa-solid fa-calendar-days"></i> Competência:</span>
+        <button 
+          type="button" 
+          @click="changeMonth(-1)" 
+          class="btn-nav-month"
+          title="Mês Anterior"
+        >
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
         <input 
           type="month" 
           v-model="selectedMonth" 
           class="month-input"
         />
         <button 
-          class="btn-today" 
-          @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
-          type="button"
+          type="button" 
+          @click="changeMonth(1)" 
+          class="btn-nav-month"
+          title="Mês Seguinte"
         >
-          Mês Atual
+          <i class="fa-solid fa-chevron-right"></i>
         </button>
+      </div>
+
+      <button 
+        class="btn-today" 
+        @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
+        type="button"
+      >
+        Mês Atual
+      </button>
         <button 
           v-if="transFixeds.length === 0" 
           class="btn-today animate-pulse" 
@@ -654,7 +681,6 @@ const getCardUsagePercentage = (cardTotal) => {
             </label>
           </div>
         </div>
-      </div>
       <div>
         <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
           Período: <strong style="color: var(--text-primary);">{{ getMonthYearString(selectedMonth) }}</strong>
@@ -1300,5 +1326,26 @@ const getCardUsagePercentage = (cardTotal) => {
 .import-item-row:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-nav-month {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  padding: 0;
+}
+
+.btn-nav-month:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--text-secondary);
+  color: #fff;
 }
 </style>
