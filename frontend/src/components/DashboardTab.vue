@@ -378,7 +378,73 @@ const getPreviousMonth = (ym) => {
   return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 };
 
-const importFixedExpenses = async () => {
+const showImportModal = ref(false);
+const prevMonthTransactions = ref([]);
+const selectedImportIds = ref([]);
+
+const groupedPrevTransactions = computed(() => {
+  const groups = {
+    income: { name: 'Receitas', icon: 'fa-circle-arrow-up', class: 'text-success', items: [] },
+    card: { name: 'Cartões', icon: 'fa-credit-card', class: 'text-danger', items: [] },
+    fixed: { name: 'Fixos', icon: 'fa-house-lock', class: 'text-warning', items: [] },
+    variable: { name: 'Outros', icon: 'fa-basket-shopping', class: 'text-info', items: [] }
+  };
+
+  prevMonthTransactions.value.forEach(t => {
+    if (groups[t.type]) {
+      groups[t.type].items.push(t);
+    } else {
+      groups.variable.items.push(t);
+    }
+  });
+
+  return Object.keys(groups)
+    .filter(key => groups[key].items.length > 0)
+    .reduce((obj, key) => {
+      obj[key] = groups[key];
+      return obj;
+    }, {});
+});
+
+const isAllSelected = computed({
+  get() {
+    return prevMonthTransactions.value.length > 0 && selectedImportIds.value.length === prevMonthTransactions.value.length;
+  },
+  set(value) {
+    if (value) {
+      selectedImportIds.value = prevMonthTransactions.value.map(t => t._id);
+    } else {
+      selectedImportIds.value = [];
+    }
+  }
+});
+
+const isCategoryAllSelected = (categoryKey) => {
+  const group = groupedPrevTransactions.value[categoryKey];
+  if (!group || group.items.length === 0) return false;
+  return group.items.every(t => selectedImportIds.value.includes(t._id));
+};
+
+const toggleCategorySelection = (categoryKey) => {
+  const group = groupedPrevTransactions.value[categoryKey];
+  if (!group) return;
+  const itemIds = group.items.map(t => t._id);
+  const allSelected = isCategoryAllSelected(categoryKey);
+
+  if (allSelected) {
+    selectedImportIds.value = selectedImportIds.value.filter(id => !itemIds.includes(id));
+  } else {
+    const newSelection = [...selectedImportIds.value];
+    itemIds.forEach(id => {
+      if (!newSelection.includes(id)) {
+        newSelection.push(id);
+      }
+    });
+    selectedImportIds.value = newSelection;
+  }
+};
+
+const openImportModal = async () => {
   const prevMonthYM = getPreviousMonth(selectedMonth.value);
   if (!prevMonthYM) return;
 
@@ -387,38 +453,46 @@ const importFixedExpenses = async () => {
 
   try {
     importLoading.value = true;
-    
-    // 1. Fetch previous month transactions
     const res = await fetch(`${props.apiUrl}/api/finances/${urlMonth}`, {
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Não foi possível buscar os lançamentos do mês anterior');
 
     const prevTransactions = await res.json();
-    
-    // 2. Filter for fixed expenses
-    const fixedExpenses = prevTransactions.filter(t => t.type === 'fixed');
-    
-    if (fixedExpenses.length === 0) {
-      emit('toast', { message: 'Nenhum gasto fixo encontrado no mês anterior para importar.', type: 'info' });
+    if (prevTransactions.length === 0) {
+      emit('toast', { message: 'Nenhum lançamento encontrado no mês anterior para importar.', type: 'info' });
       return;
     }
 
-    // 3. Confirm with user
-    if (!confirm(`Deseja importar ${fixedExpenses.length} gastos fixos de ${formattedPrevMonth} para o mês atual?`)) {
-      return;
-    }
+    prevMonthTransactions.value = prevTransactions;
+    selectedImportIds.value = prevTransactions.map(t => t._id);
+    showImportModal.value = true;
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  } finally {
+    importLoading.value = false;
+  }
+};
 
-    // 4. Send POST requests sequentially for each fixed expense
+const executeImport = async () => {
+  if (selectedImportIds.value.length === 0) {
+    emit('toast', { message: 'Selecione pelo menos um lançamento para importar.', type: 'warning' });
+    return;
+  }
+
+  try {
+    importLoading.value = true;
+    const transactionsToImport = prevMonthTransactions.value.filter(t => selectedImportIds.value.includes(t._id));
+    
     let successCount = 0;
-    for (const expense of fixedExpenses) {
+    for (const trans of transactionsToImport) {
       const payload = {
-        description: expense.description,
-        amount: expense.amount,
-        type: 'fixed',
-        cardName: '',
+        description: trans.description,
+        amount: trans.amount,
+        type: trans.type,
+        cardName: trans.type === 'card' ? trans.cardName || '' : '',
         month: getMonthYearString(selectedMonth.value),
-        info: expense.info || ''
+        info: trans.info || ''
       };
 
       const postRes = await fetch(`${props.apiUrl}/api/finances`, {
@@ -433,13 +507,13 @@ const importFixedExpenses = async () => {
     }
 
     if (successCount > 0) {
-      emit('toast', { message: `${successCount} gastos fixos importados com sucesso!`, type: 'success' });
+      emit('toast', { message: `${successCount} lançamentos importados com sucesso!`, type: 'success' });
+      showImportModal.value = false;
       fetchTransactions();
       fetchAnnualEvolution();
     } else {
-      throw new Error('Falha ao importar os gastos fixos');
+      throw new Error('Falha ao importar os lançamentos');
     }
-
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   } finally {
@@ -521,13 +595,13 @@ const getCardUsagePercentage = (cardTotal) => {
         <button 
           v-if="transFixeds.length === 0" 
           class="btn-today animate-pulse" 
-          @click="importFixedExpenses" 
+          @click="openImportModal" 
           :disabled="importLoading"
           type="button"
           style="margin-left: 0.5rem; background: linear-gradient(135deg, var(--color-primary), #a855f7); color: white; border: none; font-weight: 600;"
         >
-          <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i> Importando...</span>
-          <span v-else><i class="fa-solid fa-cloud-arrow-down"></i> Importar Fixos</span>
+          <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</span>
+          <span v-else><i class="fa-solid fa-cloud-arrow-down"></i> Importar do Mês Anterior</span>
         </button>
         <button 
           class="btn-today" 
@@ -1029,6 +1103,93 @@ const getCardUsagePercentage = (cardTotal) => {
         </div>
       </div>
     </div>
+
+    <!-- Beautiful Custom Modal for importing transactions from previous month -->
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal-card" style="max-width: 600px; display: flex; flex-direction: column; max-height: 85vh;">
+        <!-- Modal Header -->
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; flex-shrink: 0;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; color: var(--text-primary);">
+            <i class="fa-solid fa-cloud-arrow-down" style="color: var(--color-primary);"></i>
+            Importar do Mês Anterior
+          </h3>
+          <button @click="showImportModal = false" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Select All Global bar -->
+        <div style="padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+          <label class="config-checkbox-label" style="font-weight: 600;">
+            <input type="checkbox" v-model="isAllSelected" />
+            <span>Selecionar Todos ({{ prevMonthTransactions.length }})</span>
+          </label>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">
+            Mês anterior: {{ getMonthYearString(getPreviousMonth(selectedMonth)) }}
+          </span>
+        </div>
+
+        <!-- Modal Body (Scrollable list of categories and items) -->
+        <div class="modal-body custom-scroll" style="overflow-y: auto; padding: 1rem 0; flex-grow: 1; text-align: left;">
+          <div v-for="(group, key) in groupedPrevTransactions" :key="key" style="margin-bottom: 1.25rem;">
+            
+            <!-- Category Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px dashed rgba(255, 255, 255, 0.08);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.9rem;" :class="group.class">
+                <i class="fa-solid" :class="group.icon"></i>
+                <span>{{ group.name }}</span>
+              </div>
+              <button 
+                type="button" 
+                @click="toggleCategorySelection(key)"
+                style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 0.75rem; font-weight: 600; padding: 0;"
+              >
+                {{ isCategoryAllSelected(key) ? 'Desmarcar Todos' : 'Selecionar Todos' }}
+              </button>
+            </div>
+
+            <!-- Items under this Category -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label 
+                v-for="item in group.items" 
+                :key="item._id" 
+                class="import-item-row"
+                style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); cursor: pointer; transition: background 0.2s;"
+              >
+                <div style="display: flex; align-items: center; gap: 0.75rem; flex-grow: 1; min-width: 0;">
+                  <input type="checkbox" :value="item._id" v-model="selectedImportIds" style="cursor: pointer; accent-color: var(--color-primary); width: 16px; height: 16px; flex-shrink: 0;" />
+                  <div style="display: flex; flex-direction: column; min-width: 0;">
+                    <span style="font-size: 0.85rem; color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ item.description }}</span>
+                    <span v-if="item.info || item.cardName" style="font-size: 0.7rem; color: var(--text-muted); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                      {{ item.cardName ? `💳 ${item.cardName}` : '' }} {{ item.info ? `• ${item.info}` : '' }}
+                    </span>
+                  </div>
+                </div>
+                <span style="font-size: 0.85rem; font-weight: bold; flex-shrink: 0; margin-left: 0.5rem;" :class="group.class">
+                  {{ formatCurrency(item.amount) }}
+                </span>
+              </label>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem; flex-shrink: 0;">
+          <button @click="showImportModal = false" class="btn btn-secondary" type="button" style="min-height: 38px;">Cancelar</button>
+          <button 
+            @click="executeImport" 
+            class="btn btn-primary" 
+            type="button" 
+            style="min-height: 38px; background: linear-gradient(135deg, var(--color-primary), #a855f7); border: none;"
+            :disabled="importLoading || selectedImportIds.length === 0"
+          >
+            <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i> Importando...</span>
+            <span v-else><i class="fa-solid fa-cloud-arrow-down"></i> Importar Selecionados ({{ selectedImportIds.length }})</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1130,5 +1291,10 @@ const getCardUsagePercentage = (cardTotal) => {
   accent-color: var(--color-primary);
   width: 15px;
   height: 15px;
+}
+
+.import-item-row:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 </style>
