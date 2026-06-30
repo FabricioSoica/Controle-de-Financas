@@ -1592,8 +1592,8 @@ a:hover {
   }
   
   .toast {
-    transform: translateY(-100px) !important;
-    animation: slideInMobile 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    transform: translateY(-100px);
+    animation: slideInMobile 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 
@@ -1710,9 +1710,13 @@ a:hover {
 }
 
 @keyframes slideInMobile {
+  from {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
   to {
-    transform: translateY(0) !important;
-    opacity: 1 !important;
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 
