@@ -591,47 +591,52 @@ const getCardUsagePercentage = (cardTotal) => {
   <div>
     <!-- Month Picker -->
     <div class="filter-bar" style="position: relative; z-index: 50;">
+      <!-- Month Picker Container -->
       <div class="month-picker-container">
         <span class="month-picker-label"><i class="fa-solid fa-calendar-days"></i> Competência:</span>
-        <button 
-          type="button" 
-          @click="changeMonth(-1)" 
-          class="btn-nav-month"
-          title="Mês Anterior"
-        >
-          <i class="fa-solid fa-chevron-left"></i>
-        </button>
-        <input 
-          type="month" 
-          v-model="selectedMonth" 
-          class="month-input"
-        />
-        <button 
-          type="button" 
-          @click="changeMonth(1)" 
-          class="btn-nav-month"
-          title="Mês Seguinte"
-        >
-          <i class="fa-solid fa-chevron-right"></i>
-        </button>
+        <div class="month-nav-group">
+          <button 
+            type="button" 
+            @click="changeMonth(-1)" 
+            class="btn-nav-month"
+            title="Mês Anterior"
+          >
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <input 
+            type="month" 
+            v-model="selectedMonth" 
+            class="month-input"
+          />
+          <button 
+            type="button" 
+            @click="changeMonth(1)" 
+            class="btn-nav-month"
+            title="Mês Seguinte"
+          >
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
       </div>
 
-      <button 
-        class="btn-today" 
-        @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
-        type="button"
-      >
-        Mês Atual
-      </button>
+      <!-- Action Buttons Group -->
+      <div class="filter-actions-group">
+        <button 
+          class="btn-today" 
+          @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
+          type="button"
+        >
+          Mês Atual
+        </button>
         <button 
           v-if="transFixeds.length === 0" 
           class="btn-today animate-pulse" 
           @click="openImportModal" 
           :disabled="importLoading"
           type="button"
-          style="margin-left: 0.5rem; background: linear-gradient(135deg, var(--color-primary), #a855f7); color: white; border: none; font-weight: 600;"
+          style="background: linear-gradient(135deg, var(--color-primary), #a855f7); color: white; border: none; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;"
         >
-          <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i> Carregando...</span>
+          <span v-if="importLoading"><i class="fa-solid fa-spinner fa-spin"></i></span>
           <span v-else><i class="fa-solid fa-cloud-arrow-down"></i> Importar do Mês Anterior</span>
         </button>
         <button 
@@ -644,11 +649,11 @@ const getCardUsagePercentage = (cardTotal) => {
           <i class="fa-solid fa-file-excel" style="color: var(--color-success);"></i> Exportar Mês
         </button>
 
-        <!-- Backdrop to close dropdown click-outside -->
-        <div v-if="showCardConfig" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent;" @click="showCardConfig = false"></div>
-
         <!-- Card Configuration Dropdown Button -->
         <div style="position: relative; z-index: 1000;">
+          <!-- Backdrop to close dropdown click-outside -->
+          <div v-if="showCardConfig" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; background: transparent;" @click="showCardConfig = false"></div>
+          
           <button 
             class="btn-today" 
             @click="showCardConfig = !showCardConfig"
@@ -681,7 +686,10 @@ const getCardUsagePercentage = (cardTotal) => {
             </label>
           </div>
         </div>
-      <div>
+      </div>
+
+      <!-- Period Display -->
+      <div class="period-display">
         <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
           Período: <strong style="color: var(--text-primary);">{{ getMonthYearString(selectedMonth) }}</strong>
         </span>
@@ -1347,5 +1355,95 @@ const getCardUsagePercentage = (cardTotal) => {
   background: rgba(255, 255, 255, 0.15);
   border-color: var(--text-secondary);
   color: #fff;
+}
+
+/* Scoped layout overrides for the filter toolbar */
+.filter-bar {
+  display: flex;
+  justify-content: flex-start !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.month-picker-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.month-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.filter-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.period-display {
+  margin-left: auto; /* Push period display to the far right on desktop */
+}
+
+/* Mobile responsive rules for 900px and under */
+@media (max-width: 900px) {
+  .filter-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1.25rem !important;
+    padding: 1.25rem !important;
+  }
+  
+  .month-picker-container {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .month-picker-label {
+    margin-bottom: 0.25rem;
+  }
+
+  .month-nav-group {
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  
+  .month-input {
+    flex-grow: 1 !important;
+    max-width: 180px !important;
+    text-align: center;
+  }
+
+  .filter-actions-group {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .filter-actions-group .btn-today {
+    margin: 0 !important;
+    width: 100% !important;
+    justify-content: center !important;
+    font-size: 0.8rem !important;
+    padding: 0.6rem 0.5rem !important;
+    min-height: 40px !important;
+  }
+  
+  .period-display {
+    margin-left: 0 !important;
+    text-align: center !important;
+    padding-top: 0.75rem !important;
+    border-top: 1px dashed var(--border-color) !important;
+    width: 100% !important;
+  }
 }
 </style>
