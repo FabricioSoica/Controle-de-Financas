@@ -459,13 +459,17 @@ const openImportModal = async () => {
     if (!res.ok) throw new Error('Não foi possível buscar os lançamentos do mês anterior');
 
     const prevTransactions = await res.json();
-    if (prevTransactions.length === 0) {
-      emit('toast', { message: 'Nenhum lançamento encontrado no mês anterior para importar.', type: 'info' });
+    
+    // Filter out credit card installments (which are already automatically created for subsequent months)
+    const importableTransactions = prevTransactions.filter(t => !(t.type === 'card' && t.description.includes(' (')));
+    
+    if (importableTransactions.length === 0) {
+      emit('toast', { message: 'Nenhum lançamento importável encontrado no mês anterior.', type: 'info' });
       return;
     }
 
-    prevMonthTransactions.value = prevTransactions;
-    selectedImportIds.value = prevTransactions.map(t => t._id);
+    prevMonthTransactions.value = importableTransactions;
+    selectedImportIds.value = importableTransactions.map(t => t._id);
     showImportModal.value = true;
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
