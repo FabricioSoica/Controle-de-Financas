@@ -19,7 +19,7 @@ const addMonths = (monthYearStr, monthsToAdd) => {
     month -= 12;
     year += 1;
   }
-  
+
   return `${String(month).padStart(2, '0')}/${year}`;
 };
 
@@ -32,10 +32,10 @@ router.get('/summary/evolution', async (req, res) => {
     transactions.forEach(t => {
       const m = t.month;
       if (!m) return;
-      
+
       const [monthStr, yearStr] = m.split('/');
       const sortKey = `${yearStr}-${monthStr}`;
-      
+
       if (!monthlyData[sortKey]) {
         monthlyData[sortKey] = {
           monthLabel: m,
@@ -46,7 +46,7 @@ router.get('/summary/evolution', async (req, res) => {
           variable: 0
         };
       }
-      
+
       if (t.type === 'income') monthlyData[sortKey].income += t.amount;
       else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
       else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
@@ -83,7 +83,7 @@ router.post('/goal', async (req, res) => {
     if (targetNetResult === undefined) {
       return res.status(400).json({ error: 'Campo obrigatório ausente: valor da meta.' });
     }
-    
+
     let goal = await MonthlyGoal.findOne({ userId: req.user.id, month: 'global' });
     if (goal) {
       goal.targetNetResult = parseFloat(targetNetResult);
@@ -106,9 +106,9 @@ router.post('/goal', async (req, res) => {
 router.get('/:month', async (req, res) => {
   try {
     const month = req.params.month.replace(/[-_]/g, '/');
-    const transactions = await Transaction.find({ 
-      userId: req.user.id, 
-      month 
+    const transactions = await Transaction.find({
+      userId: req.user.id,
+      month
     }).sort({ createdAt: -1 });
     res.json(transactions);
   } catch (error) {
@@ -123,7 +123,7 @@ router.post('/', async (req, res) => {
     if (!description || amount === undefined || !type || !month) {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: descrição, valor, tipo e mês são obrigatórios.' });
     }
-    
+
     // For card types, set cardName (fallback to description if empty)
     let finalCardName = '';
     if (type === 'card') {
@@ -178,7 +178,7 @@ router.post('/', async (req, res) => {
       month: monthFormatted,
       info: info || ''
     });
-    
+
     const savedTransaction = await newTransaction.save();
     res.status(201).json(savedTransaction);
   } catch (error) {
@@ -190,7 +190,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { description, amount, type, month, info, cardName, installments } = req.body;
-    
+
     // Fetch the original transaction to check its status
     const originalTrans = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
     if (!originalTrans) {
@@ -223,7 +223,7 @@ router.put('/:id', async (req, res) => {
       originalTrans.cardName = finalCardName;
       originalTrans.month = monthFormatted;
       originalTrans.info = info !== undefined ? info : originalTrans.info;
-      
+
       const updatedFirst = await originalTrans.save();
       const savedTransactions = [updatedFirst];
 
@@ -262,7 +262,7 @@ router.put('/:id', async (req, res) => {
     if (type !== undefined) updatedFields.type = type;
     if (month !== undefined) updatedFields.month = month.replace(/[-_]/g, '/');
     if (info !== undefined) updatedFields.info = info;
-    
+
     if (targetType === 'card') {
       if (cardName !== undefined) {
         updatedFields.cardName = cardName.trim();
@@ -287,16 +287,17 @@ router.put('/:id', async (req, res) => {
 // Delete a transaction
 router.delete('/:id', async (req, res) => {
   try {
+    const { deleteAll } = req.query;
     const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
     if (!transaction) {
       return res.status(404).json({ error: 'Lançamento não encontrado.' });
     }
 
-    // Se for compra parcelada no cartão, apaga todas as parcelas com o mesmo nome base
-    if (transaction.type === 'card' && transaction.description.includes(' (')) {
+    // Se for compra parcelada no cartão E o usuário escolheu apagar todas (deleteAll === 'true')
+    if (deleteAll === 'true' && transaction.type === 'card' && transaction.description.includes(' (')) {
       const baseName = transaction.description.split(' (')[0].trim();
       const escapedName = baseName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      
+
       await Transaction.deleteMany({
         userId: req.user.id,
         type: 'card',

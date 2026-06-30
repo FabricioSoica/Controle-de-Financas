@@ -312,15 +312,14 @@ const editTransaction = (t) => {
 const showDeleteModal = ref(false);
 const transactionToDelete = ref(null);
 
+const isInstallmentToDelete = computed(() => {
+  const t = transactionToDelete.value;
+  return t && t.type === 'card' && t.description.includes(' (');
+});
+
 const deleteTransaction = (t) => {
-  if (t.type === 'card' && t.description.includes(' (')) {
-    transactionToDelete.value = t;
-    showDeleteModal.value = true;
-  } else {
-    if (confirm('Deseja realmente excluir este lançamento?')) {
-      executeDelete(t._id, false);
-    }
-  }
+  transactionToDelete.value = t;
+  showDeleteModal.value = true;
 };
 
 const executeDelete = async (id, deleteAll) => {
@@ -971,7 +970,7 @@ const getCardUsagePercentage = (cardTotal) => {
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
           <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem; color: var(--text-primary);">
             <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-danger);"></i>
-            Excluir Compra Parcelada
+            {{ isInstallmentToDelete ? 'Excluir Compra Parcelada' : 'Excluir Lançamento' }}
           </h3>
           <button @click="closeDeleteModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
             <i class="fa-solid fa-xmark"></i>
@@ -980,32 +979,50 @@ const getCardUsagePercentage = (cardTotal) => {
         
         <div class="modal-body" style="padding: 1.25rem 0 1.5rem 0; text-align: left;">
           <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
-            Este lançamento faz parte de uma compra parcelada no cartão:
+            {{ isInstallmentToDelete 
+               ? 'Este lançamento faz parte de uma compra parcelada no cartão:' 
+               : 'Tem certeza que deseja excluir o lançamento abaixo?' }}
           </p>
           <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1.25rem;">
             <div style="font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 0.25rem;">
               {{ transactionToDelete?.description }}
             </div>
-            <div style="font-size: 0.8rem; color: var(--color-danger); font-weight: 600; display: flex; align-items: center; gap: 0.35rem;">
-              <span>💳 {{ transactionToDelete?.cardName || 'Geral' }}</span>
+            <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+              <span v-if="transactionToDelete?.type === 'card'" style="color: var(--color-danger);">💳 {{ transactionToDelete?.cardName || 'Geral' }}</span>
+              <span v-else-if="transactionToDelete?.type === 'income'" style="color: var(--color-success);">📥 Receita</span>
+              <span v-else-if="transactionToDelete?.type === 'fixed'" style="color: var(--color-warning);">📌 Fixo</span>
+              <span v-else style="color: var(--color-info);">🏷️ Outros</span>
+              
               <span>•</span>
-              <span>{{ formatCurrency(transactionToDelete?.amount) }}</span>
+              <span style="color: #fff;">{{ formatCurrency(transactionToDelete?.amount) }}</span>
             </div>
           </div>
-          <p style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+          <p v-if="isInstallmentToDelete" style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
             Como você deseja excluir esta compra?
           </p>
         </div>
         
         <div class="modal-footer" style="display: flex; flex-direction: column; gap: 0.65rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-          <button @click="confirmDelete(false)" class="btn btn-secondary" type="button" style="min-height: 42px; width: 100%; justify-content: center; background: rgba(255,255,255,0.03); border-color: var(--border-color); color: #fff;">
-            <i class="fa-solid fa-calendar-minus" style="margin-right: 0.5rem; color: var(--color-primary);"></i>
-            Excluir Apenas do Mês Atual
-          </button>
-          <button @click="confirmDelete(true)" class="btn btn-danger" type="button" style="min-height: 42px; width: 100%; justify-content: center;">
-            <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i>
-            Excluir de Todos os Meses
-          </button>
+          <!-- Opções de parcelamento -->
+          <template v-if="isInstallmentToDelete">
+            <button @click="confirmDelete(false)" class="btn btn-secondary" type="button" style="min-height: 42px; width: 100%; justify-content: center; background: rgba(255,255,255,0.03); border-color: var(--border-color); color: #fff;">
+              <i class="fa-solid fa-calendar-minus" style="margin-right: 0.5rem; color: var(--color-primary);"></i>
+              Excluir Apenas do Mês Atual
+            </button>
+            <button @click="confirmDelete(true)" class="btn btn-danger" type="button" style="min-height: 42px; width: 100%; justify-content: center;">
+              <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i>
+              Excluir de Todos os Meses
+            </button>
+          </template>
+          
+          <!-- Opções para lançamento normal -->
+          <template v-else>
+            <button @click="confirmDelete(false)" class="btn btn-danger" type="button" style="min-height: 42px; width: 100%; justify-content: center;">
+              <i class="fa-solid fa-trash-can" style="margin-right: 0.5rem;"></i>
+              Excluir Lançamento
+            </button>
+          </template>
+          
           <button @click="closeDeleteModal" class="btn btn-secondary" type="button" style="min-height: 38px; width: 100%; justify-content: center; margin-top: 0.25rem;">
             Cancelar
           </button>
