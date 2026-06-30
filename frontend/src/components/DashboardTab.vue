@@ -888,7 +888,7 @@ const getCardUsagePercentage = (cardTotal) => {
             <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
               <i class="fa-solid fa-list-check"></i> Distribuição dos Lançamentos
             </h3>
-            <span class="month-picker-label">Total Geral: {{ formatCurrency(totalIncomes - totalCards - totalFixeds - totalVariables) }}</span>
+            <span class="month-picker-label">Gastos do Mês: {{ formatCurrency(totalCards + totalFixeds + totalVariables) }}</span>
           </div>
           
           <div class="category-columns-grid">
