@@ -287,45 +287,27 @@ router.put('/:id', async (req, res) => {
 // Delete a transaction
 router.delete('/:id', async (req, res) => {
   try {
-    const transaction = await Transaction.findOne({ 
-      _id: req.params.id, 
-      userId: req.user.id 
-    });
-
+    const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
     if (!transaction) {
-      return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
+      return res.status(404).json({ error: 'Lançamento não encontrado.' });
     }
 
-    let deletedCount = 1;
-    const match = transaction.description.match(/^(.+)\s\((\d{2})\/(\d{2})\)$/);
-
-    if (transaction.type === 'card' && match) {
-      const baseDescription = match[1];
-      const totalInstallments = match[3];
-
-      const escapeRegExp = (string) => {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      };
+    // Se for compra parcelada no cartão, apaga todas as parcelas com o mesmo nome base
+    if (transaction.type === 'card' && transaction.description.includes(' (')) {
+      const baseName = transaction.description.split(' (')[0].trim();
+      const escapedName = baseName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       
-      const regexPattern = new RegExp("^" + escapeRegExp(baseDescription.trim()) + " \\(\\d{2}\\/" + totalInstallments + "\\)$");
-
-      const deleteResult = await Transaction.deleteMany({
+      await Transaction.deleteMany({
         userId: req.user.id,
         type: 'card',
         cardName: transaction.cardName,
-        description: { $regex: regexPattern }
+        description: { $regex: new RegExp('^' + escapedName + ' \\(') }
       });
-      deletedCount = deleteResult.deletedCount;
     } else {
       await Transaction.deleteOne({ _id: transaction._id });
     }
 
-    res.json({ 
-      message: deletedCount > 1 
-        ? `${deletedCount} parcelas do lançamento foram excluídas com sucesso.` 
-        : 'Lançamento deletado com sucesso.', 
-      id: req.params.id 
-    });
+    res.json({ message: 'Lançamento deletado com sucesso.', id: req.params.id });
   } catch (error) {
     res.status(500).json({ error: 'Erro ao deletar lançamento: ' + error.message });
   }
