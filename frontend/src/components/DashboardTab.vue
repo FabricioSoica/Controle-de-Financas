@@ -1429,6 +1429,13 @@ const getCardUsagePercentage = (cardTotal) => {
     width: 100% !important;
   }
 
+  .filter-actions-group > *:nth-child(odd):last-child {
+    grid-column: span 2 !important;
+    justify-self: center !important;
+    width: 50% !important;
+    min-width: 140px !important;
+  }
+
   .filter-actions-group .btn-today {
     margin: 0 !important;
     width: 100% !important;
