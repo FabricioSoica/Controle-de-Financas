@@ -880,7 +880,7 @@ const getCardUsagePercentage = (cardTotal) => {
           <div v-if="transType === 'card'" class="form-group">
             <div class="form-row-2">
               <div class="form-group">
-                <label class="form-label">Qual Cartão de Crédito?</label>
+                <label class="form-label">Escolha o Cartão:</label>
                 <input 
                   type="text" 
                   v-model="transCardName" 
