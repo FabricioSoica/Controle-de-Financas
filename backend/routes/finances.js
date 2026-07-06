@@ -134,7 +134,9 @@ router.post('/', async (req, res) => {
 
     // If type === 'card' and installments is a valid number greater than 1
     if (type === 'card' && installments && parseInt(installments, 10) > 1) {
+      const { isOldInstallment, currentInstallmentNumber } = req.body;
       const totalInstallments = parseInt(installments, 10);
+      const startInstallment = (isOldInstallment && currentInstallmentNumber) ? parseInt(currentInstallmentNumber, 10) : 1;
       const totalAmount = parseFloat(amount);
       const installmentAmount = Math.floor((totalAmount / totalInstallments) * 100) / 100;
       const remainder = Math.round((totalAmount - (installmentAmount * totalInstallments)) * 100);
@@ -148,21 +150,24 @@ router.post('/', async (req, res) => {
         }
         currentAmount = parseFloat(currentAmount.toFixed(2));
 
-        const targetMonth = addMonths(monthFormatted, i - 1);
-        const installmentDesc = `${description.trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
+        // Save only the current and future installments
+        if (i >= startInstallment) {
+          const targetMonth = addMonths(monthFormatted, i - startInstallment);
+          const installmentDesc = `${description.trim()} (${String(i).padStart(2, '0')}/${String(totalInstallments).padStart(2, '0')})`;
 
-        const newTransaction = new Transaction({
-          userId: req.user.id,
-          description: installmentDesc,
-          amount: currentAmount,
-          type,
-          cardName: finalCardName,
-          month: targetMonth,
-          info: info || ''
-        });
+          const newTransaction = new Transaction({
+            userId: req.user.id,
+            description: installmentDesc,
+            amount: currentAmount,
+            type,
+            cardName: finalCardName,
+            month: targetMonth,
+            info: info || ''
+          });
 
-        const saved = await newTransaction.save();
-        savedTransactions.push(saved);
+          const saved = await newTransaction.save();
+          savedTransactions.push(saved);
+        }
       }
 
       return res.status(201).json(savedTransactions);

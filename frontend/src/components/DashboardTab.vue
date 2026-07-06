@@ -26,6 +26,8 @@ const transType = ref('card'); // income, fixed, card, variable
 const transCardName = ref('');
 const transInfo = ref('');
 const transInstallments = ref(1);
+const isOldInstallment = ref(false);
+const currentInstallmentNumber = ref(1);
 const targetNetResult = ref(0);
 const showGoalModal = ref(false);
 const tempGoalValue = ref('');
@@ -259,6 +261,10 @@ const saveTransaction = async () => {
 
   if (transType.value === 'card' && transInstallments.value > 1) {
     payload.installments = parseInt(transInstallments.value, 10);
+    if (isOldInstallment.value) {
+      payload.isOldInstallment = true;
+      payload.currentInstallmentNumber = parseInt(currentInstallmentNumber.value, 10);
+    }
   }
 
   try {
@@ -306,6 +312,8 @@ const editTransaction = (t) => {
   transCardName.value = t.cardName || '';
   transInfo.value = t.info || '';
   transInstallments.value = 1;
+  isOldInstallment.value = false;
+  currentInstallmentNumber.value = 1;
   isEditingTrans.value = true;
 };
 
@@ -362,7 +370,18 @@ const resetTransForm = () => {
   transCardName.value = '';
   transInfo.value = '';
   transInstallments.value = 1;
+  isOldInstallment.value = false;
+  currentInstallmentNumber.value = 1;
   isEditingTrans.value = false;
+};
+
+const handleOldInstallmentChange = () => {
+  if (isOldInstallment.value) {
+    if (transInstallments.value < 2) {
+      transInstallments.value = 2;
+    }
+    currentInstallmentNumber.value = 1;
+  }
 };
 
 // Helper to get previous month in YYYY-MM format
@@ -859,8 +878,8 @@ const getCardUsagePercentage = (cardTotal) => {
 
           <!-- Custom Credit Card selection and Installments (Only if type === 'card') -->
           <div v-if="transType === 'card'" class="form-group">
-            <div class="form-row-2" style="align-items: end;">
-              <div class="form-group" style="margin-bottom: 0;">
+            <div class="form-row-2">
+              <div class="form-group">
                 <label class="form-label">Qual Cartão de Crédito?</label>
                 <input 
                   type="text" 
@@ -875,16 +894,51 @@ const getCardUsagePercentage = (cardTotal) => {
                   <option v-for="card in uniqueCardNames" :value="card" :key="card" />
                 </datalist>
               </div>
-              <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Parcelas (x)</label>
+              <div class="form-group">
+                <label class="form-label">
+                  {{ isOldInstallment ? 'Total de parcelas originais' : 'Parcelas (x)' }}
+                </label>
                 <input 
                   type="number" 
                   v-model="transInstallments" 
-                  min="1" 
+                  :min="isOldInstallment ? 2 : 1" 
                   max="72"
                   class="form-input"
                   required
                 />
+              </div>
+            </div>
+
+            <!-- Checkbox for Old Installment -->
+            <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
+              <label class="config-checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                <input 
+                  type="checkbox" 
+                  v-model="isOldInstallment"
+                  @change="handleOldInstallmentChange"
+                />
+                <span>Este é um parcelamento antigo?</span>
+              </label>
+            </div>
+
+            <!-- If it's an old installment, show the current installment input -->
+            <div v-if="isOldInstallment" class="form-row-2" style="margin-top: 0.5rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Parcela atual neste mês (Ex: 4 de 10)</label>
+                <input 
+                  type="number" 
+                  v-model="currentInstallmentNumber" 
+                  min="1" 
+                  :max="transInstallments"
+                  class="form-input"
+                  required
+                />
+              </div>
+              <div class="form-group" style="margin-bottom: 0; display: flex; align-items: flex-end; justify-content: flex-start; padding-bottom: 0.5rem;">
+                <span class="info-badge" style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.2;">
+                  <i class="fa-solid fa-circle-info"></i>
+                  Serão criadas as parcelas de {{ currentInstallmentNumber }} a {{ transInstallments }} nos meses futuros.
+                </span>
               </div>
             </div>
           </div>
