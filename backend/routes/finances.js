@@ -124,10 +124,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: descrição, valor, tipo e mês são obrigatórios.' });
     }
 
-    // For card types, set cardName (fallback to description if empty)
+    // For card or fixed types, set cardName (fallback to description if card has empty cardName)
     let finalCardName = '';
-    if (type === 'card') {
-      finalCardName = cardName && cardName.trim() ? cardName.trim() : description.trim();
+    if (type === 'card' || type === 'fixed') {
+      finalCardName = cardName && cardName.trim() ? cardName.trim() : '';
+      if (type === 'card' && !finalCardName) {
+        finalCardName = description.trim();
+      }
     }
 
     const monthFormatted = month.replace(/[-_]/g, '/');
@@ -268,13 +271,13 @@ router.put('/:id', async (req, res) => {
     if (month !== undefined) updatedFields.month = month.replace(/[-_]/g, '/');
     if (info !== undefined) updatedFields.info = info;
 
-    if (targetType === 'card') {
+    if (targetType === 'card' || targetType === 'fixed') {
       if (cardName !== undefined) {
         updatedFields.cardName = cardName.trim();
-      } else if (description !== undefined) {
+      } else if (targetType === 'card' && description !== undefined) {
         updatedFields.cardName = description.trim();
       }
-    } else if (type !== undefined && type !== 'card') {
+    } else if (type !== undefined && type !== 'card' && type !== 'fixed') {
       updatedFields.cardName = '';
     }
 

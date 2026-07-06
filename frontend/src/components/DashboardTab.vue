@@ -254,7 +254,7 @@ const saveTransaction = async () => {
     description: transDesc.value,
     amount: parseFloat(transAmount.value),
     type: transType.value,
-    cardName: transType.value === 'card' ? transCardName.value.trim() : '',
+    cardName: (transType.value === 'card' || transType.value === 'fixed') ? transCardName.value.trim() : '',
     month: getMonthYearString(selectedMonth.value),
     info: transInfo.value
   };
@@ -577,7 +577,7 @@ const netPostFixed = computed(() => netIncome.value - totalFixeds.value);
 // Autocomplete suggestions
 const uniqueCardNames = computed(() => {
   const cards = transactions.value
-    .filter(t => t.type === 'card' && t.cardName)
+    .filter(t => (t.type === 'card' || t.type === 'fixed') && t.cardName)
     .map(t => t.cardName.trim());
   return [...new Set(cards)];
 });
@@ -585,6 +585,8 @@ const uniqueCardNames = computed(() => {
 // Credit Card Grouping & Accordion
 const cardsBreakdown = computed(() => {
   const groups = {};
+  
+  // Normal card transactions
   transCards.value.forEach(t => {
     const card = t.cardName && t.cardName.trim() ? t.cardName.trim() : (t.description || 'Geral');
     if (!groups[card]) {
@@ -597,12 +599,34 @@ const cardsBreakdown = computed(() => {
     groups[card].total += t.amount;
     groups[card].transactions.push(t);
   });
+
+  // Fixed transactions linked to a card (subscriptions)
+  transFixeds.value.forEach(t => {
+    if (t.cardName && t.cardName.trim()) {
+      const card = t.cardName.trim();
+      if (!groups[card]) {
+        groups[card] = {
+          name: card,
+          total: 0,
+          transactions: []
+        };
+      }
+      groups[card].total += t.amount;
+      groups[card].transactions.push({
+        ...t,
+        isSubscription: true
+      });
+    }
+  });
+
   return Object.values(groups).sort((a, b) => b.total - a.total);
 });
 
+const totalInvoiceSum = computed(() => cardsBreakdown.value.reduce((sum, c) => sum + c.total, 0));
+
 const getCardUsagePercentage = (cardTotal) => {
-  if (totalCards.value === 0) return 0;
-  return (cardTotal / totalCards.value) * 100;
+  if (totalInvoiceSum.value === 0) return 0;
+  return (cardTotal / totalInvoiceSum.value) * 100;
 };
 </script>
 
@@ -822,7 +846,12 @@ const getCardUsagePercentage = (cardTotal) => {
           <div v-if="openedCards[card.name]" class="cc-details custom-scroll">
             <div v-for="item in card.transactions" :key="item._id" class="cc-detail-item">
               <div style="display: flex; flex-direction: column; gap: 0.1rem;">
-                <span class="cc-detail-desc">{{ item.description }}</span>
+                <span class="cc-detail-desc">
+                  {{ item.description }}
+                  <span v-if="item.isSubscription" class="subscription-badge" style="font-size: 0.6rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.08); padding: 0.05rem 0.25rem; border-radius: 3px; margin-left: 0.25rem;">
+                    Fixo
+                  </span>
+                </span>
                 <span v-if="item.info" style="font-size: 0.65rem; color: var(--text-muted); font-style: italic;">{{ item.info }}</span>
               </div>
               <span class="cc-detail-val">{{ formatCurrency(item.amount) }}</span>
@@ -876,25 +905,29 @@ const getCardUsagePercentage = (cardTotal) => {
             </div>
           </div>
 
-          <!-- Custom Credit Card selection and Installments (Only if type === 'card') -->
-          <div v-if="transType === 'card'" class="form-group">
+          <!-- Custom Credit Card selection and Installments (Only if type === 'card' or 'fixed') -->
+          <div v-if="transType === 'card' || transType === 'fixed'" class="form-group">
             <div class="form-row-2">
-              <div class="form-group">
-                <label class="form-label">Escolha o Cartão:</label>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">
+                  {{ transType === 'fixed' ? 'Pagar com qual Cartão? (Opcional)' : 'Escolha o Cartão:' }}
+                </label>
                 <input 
                   type="text" 
                   v-model="transCardName" 
                   placeholder="Ex: Santander" 
                   class="form-input"
                   list="card-names-list-comp"
-                  required
+                  :required="transType === 'card'"
                 />
                 <!-- HTML5 native autocomplete based on previous items -->
                 <datalist id="card-names-list-comp">
                   <option v-for="card in uniqueCardNames" :value="card" :key="card" />
                 </datalist>
               </div>
-              <div class="form-group">
+
+              <!-- Only show installments input for card type -->
+              <div v-if="transType === 'card'" class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">
                   {{ isOldInstallment ? 'Total de parcelas originais' : 'Parcelas (x)' }}
                 </label>
@@ -909,8 +942,8 @@ const getCardUsagePercentage = (cardTotal) => {
               </div>
             </div>
 
-            <!-- Checkbox for Old Installment -->
-            <div class="form-group" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
+            <!-- Checkbox for Old Installment (Only if type === 'card') -->
+            <div v-if="transType === 'card'" class="form-group" style="margin-top: 0.5rem; margin-bottom: 0.5rem;">
               <label class="config-checkbox-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
                 <input 
                   type="checkbox" 
@@ -921,8 +954,8 @@ const getCardUsagePercentage = (cardTotal) => {
               </label>
             </div>
 
-            <!-- If it's an old installment, show the current installment input -->
-            <div v-if="isOldInstallment" class="form-row-2" style="margin-top: 0.5rem;">
+            <!-- If it's an old installment, show the current installment input (Only if type === 'card') -->
+            <div v-if="transType === 'card' && isOldInstallment" class="form-row-2" style="margin-top: 0.5rem;">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">Parcela atual neste mês (Ex: 4 de 10)</label>
                 <input 
@@ -1042,7 +1075,12 @@ const getCardUsagePercentage = (cardTotal) => {
               <div class="transaction-list-items">
                 <div v-for="t in transFixeds" :key="t._id" class="transaction-item">
                   <div class="item-main-row">
-                    <span class="item-desc">{{ t.description }}</span>
+                    <span class="item-desc">
+                      {{ t.description }}
+                      <span v-if="t.cardName" class="card-badge" style="font-size: 0.65rem; color: var(--color-danger); background: rgba(239, 68, 68, 0.1); padding: 0.1rem 0.35rem; border-radius: 4px; margin-left: 0.35rem; display: inline-flex; align-items: center; gap: 0.15rem;">
+                        <i class="fa-solid fa-credit-card"></i> {{ t.cardName }}
+                      </span>
+                    </span>
                     <span class="item-val text-warning">{{ formatCurrency(t.amount) }}</span>
                   </div>
                   <div class="item-details-row">
