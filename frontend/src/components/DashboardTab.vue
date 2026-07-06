@@ -522,7 +522,7 @@ const executeImport = async () => {
         description: trans.description,
         amount: trans.amount,
         type: trans.type,
-        cardName: trans.type === 'card' ? trans.cardName || '' : '',
+        cardName: (trans.type === 'card' || trans.type === 'fixed') ? trans.cardName || '' : '',
         month: getMonthYearString(selectedMonth.value),
         info: trans.info || ''
       };
