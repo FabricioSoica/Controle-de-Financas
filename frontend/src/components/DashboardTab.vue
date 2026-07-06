@@ -929,7 +929,7 @@ const getCardUsagePercentage = (cardTotal) => {
               <!-- Only show installments input for card type -->
               <div v-if="transType === 'card'" class="form-group" style="margin-bottom: 0;">
                 <label class="form-label">
-                  {{ isOldInstallment ? 'Total de parcelas originais' : 'Parcelas (x)' }}
+                  {{ isOldInstallment ? 'Parcelas Totais' : 'Parcelas (x)' }}
                 </label>
                 <input 
                   type="number" 
