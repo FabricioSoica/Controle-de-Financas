@@ -415,14 +415,14 @@ const formatDate = (dateStr) => {
 
           <div class="form-row-2">
             <div class="form-group">
-              <label class="form-label">Forma de Pagamento</label>
+              <label class="form-label" style="min-height: 34px; display: flex; align-items: flex-end;">Forma de Pagamento</label>
               <select v-model="refillPaymentType" class="form-select">
                 <option value="money">Dinheiro / Outro</option>
                 <option value="card">Cartão de Crédito</option>
               </select>
             </div>
             <div v-if="refillPaymentType === 'card'" class="form-group">
-              <label class="form-label">Nome do Cartão</label>
+              <label class="form-label" style="min-height: 34px; display: flex; align-items: flex-end;">Nome do Cartão</label>
               <select 
                 v-model="refillCardName" 
                 class="form-select"
