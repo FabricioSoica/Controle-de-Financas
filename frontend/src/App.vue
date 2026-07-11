@@ -120,6 +120,12 @@ const deleteCardConfig = async (id) => {
   }
 };
 
+const editCardConfig = (card) => {
+  newCardName.value = card.cardName;
+  newCardClosingDay.value = card.closingDay;
+  newCardDueDay.value = card.dueDay;
+};
+
 import { watch } from 'vue';
 watch(showSettingsModal, (isOpen) => {
   if (isOpen) {
@@ -359,9 +365,14 @@ const handleUnauthorized = () => {
                 <span style="font-weight: 600; color: var(--text-primary);"><i class="fa-solid fa-credit-card" style="color: var(--color-danger); opacity: 0.8; margin-right: 0.25rem;"></i> {{ c.cardName }}</span>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                   <span style="color: var(--text-secondary); font-size: 0.75rem;">Fecha: <strong>{{ c.closingDay }}</strong> | Vence: <strong>{{ c.dueDay }}</strong></span>
-                  <button @click="deleteCardConfig(c._id)" style="background: none; border: none; color: var(--color-danger); cursor: pointer; padding: 0.25rem;" title="Remover" type="button">
-                    <i class="fa-solid fa-trash-can"></i>
-                  </button>
+                  <div style="display: flex; gap: 0.25rem;">
+                    <button @click="editCardConfig(c)" style="background: none; border: none; color: var(--color-primary); cursor: pointer; padding: 0.25rem;" title="Editar" type="button">
+                      <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button @click="deleteCardConfig(c._id)" style="background: none; border: none; color: var(--color-danger); cursor: pointer; padding: 0.25rem;" title="Remover" type="button">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
