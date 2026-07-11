@@ -17,11 +17,15 @@ connectDB();
 const authRoutes = require('./routes/auth');
 const financeRoutes = require('./routes/finances');
 const shoppingRoutes = require('./routes/shopping');
+const fuelRoutes = require('./routes/fuel');
+const cardRoutes = require('./routes/cards');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/finances', financeRoutes);
 app.use('/api/shopping', shoppingRoutes);
+app.use('/api/fuel', fuelRoutes);
+app.use('/api/cards', cardRoutes);
 
 // Start server
 app.listen(PORT, () => {
