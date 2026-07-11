@@ -41,6 +41,9 @@ jobs:
             # Navega até a pasta do projeto
             cd /var/www/html/controle-financas
 
+            # Descarta qualquer alteração local temporária (evitando conflitos no git pull)
+            git reset --hard
+
             # Atualiza o código com a versão mais recente do GitHub (agora autenticado)
             git pull origin main
 
