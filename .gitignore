@@ -15,6 +15,7 @@ node_modules/
 # Compilação e saídas de Build
 /frontend/dist/
 /frontend/dist-ssr/
+/frontend/dev-dist/
 *.local
 
 # Logs
