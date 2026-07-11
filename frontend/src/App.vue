@@ -24,6 +24,7 @@ const showSettingsModal = ref(false);
 const cardConfigs = ref([]);
 const newCardName = ref('');
 const newCardClosingDay = ref('');
+const newCardDueDay = ref('');
 const configLoading = ref(false);
 
 const showToast = (message, type = 'success') => {
@@ -51,13 +52,19 @@ const fetchCardConfigs = async () => {
 };
 
 const saveCardConfig = async () => {
-  if (!newCardName.value || !newCardClosingDay.value) {
-    showToast('Por favor, preencha o nome do cartão e o dia de fechamento.', 'error');
+  if (!newCardName.value || !newCardClosingDay.value || !newCardDueDay.value) {
+    showToast('Por favor, preencha o nome do cartão, dia de fechamento e dia de vencimento.', 'error');
     return;
   }
-  const day = parseInt(newCardClosingDay.value, 10);
-  if (isNaN(day) || day < 1 || day > 31) {
+  const closing = parseInt(newCardClosingDay.value, 10);
+  const due = parseInt(newCardDueDay.value, 10);
+  
+  if (isNaN(closing) || closing < 1 || closing > 31) {
     showToast('O dia de fechamento deve ser entre 1 e 31.', 'error');
+    return;
+  }
+  if (isNaN(due) || due < 1 || due > 31) {
+    showToast('O dia de vencimento deve ser entre 1 e 31.', 'error');
     return;
   }
   
@@ -71,18 +78,20 @@ const saveCardConfig = async () => {
       },
       body: JSON.stringify({
         cardName: newCardName.value.trim(),
-        closingDay: day
+        closingDay: closing,
+        dueDay: due
       })
     });
     
     if (res.ok) {
-      showToast('Configuração de cartão salva com sucesso!');
+      showToast('Cartão salvo com sucesso!');
       newCardName.value = '';
       newCardClosingDay.value = '';
+      newCardDueDay.value = '';
       fetchCardConfigs();
     } else {
       const err = await res.json();
-      throw new Error(err.error || 'Erro ao salvar configuração');
+      throw new Error(err.error || 'Erro ao salvar cartão');
     }
   } catch (error) {
     showToast(error.message, 'error');
@@ -297,7 +306,7 @@ const handleUnauthorized = () => {
           </p>
           
           <!-- Add Card Config Form -->
-          <form @submit.prevent="saveCardConfig" style="display: grid; grid-template-columns: 1.5fr 1fr 0.8fr; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem;">
+          <form @submit.prevent="saveCardConfig" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 0.8fr; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" style="font-size: 0.75rem;">Nome do Cartão</label>
               <input 
@@ -310,11 +319,24 @@ const handleUnauthorized = () => {
               />
             </div>
             <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" style="font-size: 0.75rem;">Dia Fechamento</label>
+              <label class="form-label" style="font-size: 0.75rem;">Fechamento</label>
               <input 
                 type="number" 
                 v-model="newCardClosingDay" 
-                placeholder="Ex: 5" 
+                placeholder="Dia" 
+                min="1" 
+                max="31" 
+                class="form-input" 
+                style="padding: 0.4rem 0.75rem; font-size: 0.85rem;"
+                required
+              />
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" style="font-size: 0.75rem;">Vencimento</label>
+              <input 
+                type="number" 
+                v-model="newCardDueDay" 
+                placeholder="Dia" 
                 min="1" 
                 max="31" 
                 class="form-input" 
@@ -336,7 +358,7 @@ const handleUnauthorized = () => {
               <div v-for="c in cardConfigs" :key="c._id" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem;">
                 <span style="font-weight: 600; color: var(--text-primary);"><i class="fa-solid fa-credit-card" style="color: var(--color-danger); opacity: 0.8; margin-right: 0.25rem;"></i> {{ c.cardName }}</span>
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                  <span style="color: var(--text-secondary);">Fecha dia: <strong>{{ c.closingDay }}</strong></span>
+                  <span style="color: var(--text-secondary); font-size: 0.75rem;">Fecha: <strong>{{ c.closingDay }}</strong> | Vence: <strong>{{ c.dueDay }}</strong></span>
                   <button @click="deleteCardConfig(c._id)" style="background: none; border: none; color: var(--color-danger); cursor: pointer; padding: 0.25rem;" title="Remover" type="button">
                     <i class="fa-solid fa-trash-can"></i>
                   </button>

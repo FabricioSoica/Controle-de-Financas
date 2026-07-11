@@ -1,7 +1,7 @@
 const express = require('express');
 const FuelRefill = require('../models/FuelRefill');
 const Transaction = require('../models/Transaction');
-const CardConfig = require('../models/CardConfig');
+const CreditCard = require('../models/CreditCard');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -24,7 +24,7 @@ const calculateCompetenceMonth = async (userId, cardName, dateInput) => {
   const month = d.getUTCMonth() + 1; // 1-12
   const year = d.getUTCFullYear();
   
-  const config = await CardConfig.findOne({ userId, cardName: cardName.trim() });
+  const config = await CreditCard.findOne({ userId, cardName: cardName.trim() });
   if (config) {
     const closingDay = config.closingDay;
     if (day <= closingDay) {

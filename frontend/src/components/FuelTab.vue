@@ -96,7 +96,7 @@ const fetchSummary = async () => {
 
 const fetchConfiguredCards = async () => {
   try {
-    const res = await fetch(`${props.apiUrl}/api/cards/config`, {
+    const res = await fetch(`${props.apiUrl}/api/cards`, {
       headers: getHeaders()
     });
     if (res.ok) {
@@ -423,17 +423,19 @@ const formatDate = (dateStr) => {
             </div>
             <div v-if="refillPaymentType === 'card'" class="form-group">
               <label class="form-label">Nome do Cartão</label>
-              <input 
-                type="text" 
+              <select 
                 v-model="refillCardName" 
-                placeholder="Ex: Nubank" 
-                class="form-input"
-                list="card-names-fuel-list"
+                class="form-select"
                 required
-              />
-              <datalist id="card-names-fuel-list">
-                <option v-for="c in configuredCards" :value="c.cardName" :key="c._id" />
-              </datalist>
+              >
+                <option value="" disabled selected>Selecione um Cartão</option>
+                <option v-for="c in configuredCards" :value="c.cardName" :key="c._id">
+                  {{ c.cardName }} (Fecha dia {{ c.closingDay }})
+                </option>
+              </select>
+              <span v-if="configuredCards.length === 0" style="display: block; font-size: 0.75rem; color: var(--color-warning); margin-top: 0.25rem;">
+                Nenhum cartão cadastrado. Vá em ⚙️ no topo.
+              </span>
             </div>
           </div>
 

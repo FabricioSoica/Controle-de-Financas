@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const ShoppingItem = require('../models/ShoppingItem');
 const User = require('../models/User');
+const CreditCard = require('../models/CreditCard');
 
 const migrateOrphans = async () => {
   try {
@@ -39,6 +40,87 @@ const migrateOrphans = async () => {
   }
 };
 
+const migrateCreditCards = async () => {
+  try {
+    const db = mongoose.connection.db;
+    const collections = await db.listCollections({ name: 'cardconfigs' }).toArray();
+    
+    let oldConfigs = [];
+    if (collections.length > 0) {
+      oldConfigs = await db.collection('cardconfigs').find({}).toArray();
+      console.log(`[Migration] Found ${oldConfigs.length} old card configurations to migrate.`);
+    }
+    
+    // Scan all transactions for unique cardName values
+    const transCardNames = await Transaction.aggregate([
+      { $match: { type: 'card', cardName: { $ne: '' } } },
+      { $group: { _id: { userId: '$userId', cardName: '$cardName' } } }
+    ]);
+    
+    // Scan all fuel refills for unique cardName values (dynamically import to avoid circular dependency)
+    const FuelRefill = mongoose.model('FuelRefill');
+    const fuelCardNames = await FuelRefill.aggregate([
+      { $match: { paymentType: 'card', cardName: { $ne: '' } } },
+      { $group: { _id: { userId: '$userId', cardName: '$cardName' } } }
+    ]);
+    
+    // Combine all unique user-cardName pairs
+    const allCardNames = new Map();
+    
+    const registerPair = (userId, cardName) => {
+      if (!userId || !cardName) return;
+      const normalized = cardName.trim();
+      if (!normalized) return;
+      const key = `${userId.toString()}_${normalized.toLowerCase()}`;
+      if (!allCardNames.has(key)) {
+        allCardNames.set(key, { userId, cardName: normalized });
+      }
+    };
+    
+    transCardNames.forEach(t => registerPair(t._id.userId, t._id.cardName));
+    fuelCardNames.forEach(f => registerPair(f._id.userId, f._id.cardName));
+    oldConfigs.forEach(c => registerPair(c.userId, c.cardName));
+    
+    let createdCount = 0;
+    for (const pair of allCardNames.values()) {
+      const existingCard = await CreditCard.findOne({ userId: pair.userId, cardName: pair.cardName });
+      if (!existingCard) {
+        const oldConfig = oldConfigs.find(c => c.userId.toString() === pair.userId.toString() && c.cardName.trim().toLowerCase() === pair.cardName.toLowerCase());
+        
+        let closingDay = 5;
+        if (oldConfig && oldConfig.closingDay !== undefined) {
+          closingDay = oldConfig.closingDay;
+        }
+        
+        let dueDay = closingDay + 10;
+        if (dueDay > 31) dueDay -= 31;
+        
+        const newCard = new CreditCard({
+          userId: pair.userId,
+          cardName: pair.cardName,
+          closingDay,
+          dueDay
+        });
+        
+        await newCard.save();
+        createdCount++;
+      }
+    }
+    
+    if (createdCount > 0) {
+      console.log(`[Migration] Created ${createdCount} credit card configurations from existing transactions.`);
+    }
+    
+    if (collections.length > 0) {
+      await db.dropCollection('cardconfigs');
+      console.log(`[Migration] Cleaned up and dropped old 'cardconfigs' collection.`);
+    }
+    
+  } catch (err) {
+    console.error('[Migration] Error migrating credit cards:', err);
+  }
+};
+
 const connectDB = async () => {
   const MONGO_URI = process.env.MONGO_URI;
   if (!MONGO_URI) {
@@ -51,6 +133,8 @@ const connectDB = async () => {
     console.log('Successfully connected to MongoDB.');
     // Run DB migrations for existing/orphan data
     await migrateOrphans();
+    // Run DB migrations for credit cards
+    await migrateCreditCards();
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1);
@@ -59,5 +143,6 @@ const connectDB = async () => {
 
 module.exports = {
   connectDB,
-  migrateOrphans
+  migrateOrphans,
+  migrateCreditCards
 };

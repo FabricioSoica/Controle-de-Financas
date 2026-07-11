@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const CardConfigSchema = new mongoose.Schema({
+const CreditCardSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -17,12 +17,18 @@ const CardConfigSchema = new mongoose.Schema({
     required: true,
     min: 1,
     max: 31
+  },
+  dueDay: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 31
   }
 }, {
   timestamps: true
 });
 
 // A user can only have one configuration per card name
-CardConfigSchema.index({ userId: 1, cardName: 1 }, { unique: true });
+CreditCardSchema.index({ userId: 1, cardName: 1 }, { unique: true });
 
-module.exports = mongoose.model('CardConfig', CardConfigSchema);
+module.exports = mongoose.model('CreditCard', CreditCardSchema);

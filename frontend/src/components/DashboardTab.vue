@@ -32,6 +32,7 @@ const targetNetResult = ref(0);
 const showGoalModal = ref(false);
 const tempGoalValue = ref('');
 const annualEvolution = ref([]);
+const registeredCards = ref([]);
 const showCardConfig = ref(false);
 const importLoading = ref(false);
 const visibleCards = ref({
@@ -88,6 +89,7 @@ onMounted(() => {
   fetchTransactions();
   fetchMonthlyGoal();
   fetchAnnualEvolution();
+  fetchRegisteredCards();
 });
 
 // Watch month changes to reload transactions
@@ -125,6 +127,21 @@ const fetchAnnualEvolution = async () => {
     console.error(error.message);
   }
 };
+
+const fetchRegisteredCards = async () => {
+  if (!props.token) return;
+  try {
+    const res = await fetch(`${props.apiUrl}/api/cards`, {
+      headers: getHeaders()
+    });
+    if (res.ok) {
+      registeredCards.value = await res.json();
+    }
+  } catch (error) {
+    console.error('Error fetching registered cards:', error);
+  }
+};
+
 
 const changeMonthlyGoal = () => {
   tempGoalValue.value = targetNetResult.value || '';
@@ -912,18 +929,21 @@ const getCardUsagePercentage = (cardTotal) => {
                 <label class="form-label">
                   {{ transType === 'fixed' ? 'Pagar com qual Cartão? (Opcional)' : 'Escolha o Cartão:' }}
                 </label>
-                <input 
-                  type="text" 
+                <select 
                   v-model="transCardName" 
-                  placeholder="Ex: Santander" 
-                  class="form-input"
-                  list="card-names-list-comp"
+                  class="form-select"
                   :required="transType === 'card'"
-                />
-                <!-- HTML5 native autocomplete based on previous items -->
-                <datalist id="card-names-list-comp">
-                  <option v-for="card in uniqueCardNames" :value="card" :key="card" />
-                </datalist>
+                >
+                  <option value="" :disabled="transType === 'card'">
+                    {{ transType === 'fixed' ? 'Sem Cartão (Padrão)' : 'Selecione um Cartão' }}
+                  </option>
+                  <option v-for="card in registeredCards" :value="card.cardName" :key="card._id">
+                    {{ card.cardName }} (Fecha dia {{ card.closingDay }})
+                  </option>
+                </select>
+                <span v-if="registeredCards.length === 0" style="display: block; font-size: 0.75rem; color: var(--color-warning); margin-top: 0.25rem;">
+                  Nenhum cartão cadastrado. Vá em ⚙️ no topo.
+                </span>
               </div>
 
               <!-- Only show installments input for card type -->
