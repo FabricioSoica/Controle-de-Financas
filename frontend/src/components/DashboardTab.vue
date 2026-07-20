@@ -684,12 +684,41 @@ const categoryMetadata = {
 };
 
 const getCategoryIcon = (name) => {
-  return categoryMetadata[name]?.icon || 'fa-ellipsis';
+  if (!name) return 'fa-tag';
+  return categoryMetadata[name]?.icon || 'fa-tag';
 };
 
 const getCategoryColor = (name) => {
-  return categoryMetadata[name]?.color || '#adb5bd';
+  if (!name) return '#adb5bd';
+  if (categoryMetadata[name]) return categoryMetadata[name].color;
+  
+  // Deterministic HSL color based on string hashing
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 65%, 60%)`;
 };
+
+const availableCategories = computed(() => {
+  const defaults = transType.value === 'income'
+    ? ['Salário', 'Outras Receitas']
+    : ['Alimentação', 'Transporte', 'Combustível', 'Moradia', 'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 'Compras / Vestuário', 'Outros'];
+  
+  const used = transactions.value
+    .filter(t => {
+      if (transType.value === 'income') {
+        return t.type === 'income';
+      } else {
+        return t.type !== 'income';
+      }
+    })
+    .map(t => t.category)
+    .filter(Boolean);
+    
+  return [...new Set([...defaults, ...used])];
+});
 
 const categoryBreakdown = computed(() => {
   const expenseTransactions = transactions.value.filter(t => t.type !== 'income');
@@ -1162,24 +1191,17 @@ const donutSegments = computed(() => {
 
           <div class="form-group">
             <label class="form-label">Categoria</label>
-            <select v-model="transCategory" class="form-select" required>
-              <template v-if="transType === 'income'">
-                <option value="Salário">Salário</option>
-                <option value="Outras Receitas">Outras Receitas</option>
-              </template>
-              <template v-else>
-                <option value="Alimentação">Alimentação</option>
-                <option value="Transporte">Transporte</option>
-                <option value="Combustível">Combustível</option>
-                <option value="Moradia">Moradia</option>
-                <option value="Lazer / Viagens">Lazer / Viagens</option>
-                <option value="Saúde">Saúde</option>
-                <option value="Educação">Educação</option>
-                <option value="Assinaturas & Serviços">Assinaturas & Serviços</option>
-                <option value="Compras / Vestuário">Compras / Vestuário</option>
-                <option value="Outros">Outros</option>
-              </template>
-            </select>
+            <input 
+              type="text" 
+              v-model="transCategory" 
+              list="categories-list" 
+              class="form-input" 
+              placeholder="Selecione ou digite uma categoria"
+              required
+            />
+            <datalist id="categories-list">
+              <option v-for="cat in availableCategories" :value="cat" :key="cat" />
+            </datalist>
           </div>
 
           <div class="form-group">
