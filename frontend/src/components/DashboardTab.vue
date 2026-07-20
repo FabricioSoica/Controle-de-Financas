@@ -474,6 +474,17 @@ const closeCategoryModal = () => {
   showIconPicker.value = false;
 };
 
+const scrollToForm = () => {
+  const el = document.getElementById('transaction-form-aside');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const input = el.querySelector('input[type="text"]');
+      if (input) input.focus();
+    }, 450);
+  }
+};
+
 const handleEditFromModal = (t) => {
   closeCategoryModal();
   editTransaction(t);
@@ -1291,7 +1302,7 @@ const donutSegments = computed(() => {
     <!-- Dashboard Split Layout -->
     <div class="dashboard-grid">
       <!-- Form Side -->
-      <aside class="form-card">
+      <aside id="transaction-form-aside" class="form-card">
         <h3 class="section-title">
           <i class="fa-solid" :class="isEditingTrans ? 'fa-pen-to-square' : 'fa-circle-plus'"></i>
           {{ isEditingTrans ? 'Editar Lançamento' : 'Novo Lançamento' }}
@@ -1915,6 +1926,15 @@ const donutSegments = computed(() => {
         </div>
       </div>
     </div>
+    <!-- Floating Action Button for Mobile -->
+    <button 
+      class="mobile-fab" 
+      @click="scrollToForm" 
+      title="Novo Lançamento"
+      type="button"
+    >
+      <i class="fa-solid fa-plus"></i>
+    </button>
   </div>
 </template>
 
@@ -2138,6 +2158,37 @@ const donutSegments = computed(() => {
     padding-top: 0.75rem !important;
     border-top: 1px dashed var(--border-color) !important;
     width: 100% !important;
+  }
+}
+
+.mobile-fab {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-fab {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 80px !important;
+    right: 1.25rem !important;
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, var(--color-primary), #a855f7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+    font-size: 1.4rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(139, 92, 246, 0.3) !important;
+    z-index: 9990 !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  
+  .mobile-fab:active {
+    transform: scale(0.9) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
   }
 }
 </style>
