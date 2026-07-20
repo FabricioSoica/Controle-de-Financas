@@ -1,6 +1,7 @@
 const express = require('express');
 const Transaction = require('../models/Transaction');
 const MonthlyGoal = require('../models/MonthlyGoal');
+const CategoryConfig = require('../models/CategoryConfig');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -146,7 +147,38 @@ router.get('/categories', async (req, res) => {
   }
 });
 
-// Rename a category globally for all user transactions
+// Get all custom category configurations (like icons) for the user
+router.get('/categories/configs', async (req, res) => {
+  try {
+    const configs = await CategoryConfig.find({ userId: req.user.id });
+    res.json(configs || []);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar configurações de categorias: ' + error.message });
+  }
+});
+
+// Create or update a category configuration (e.g. save custom icon)
+router.put('/categories/configs', async (req, res) => {
+  try {
+    const { category, icon } = req.body;
+    if (!category || !category.trim()) {
+      return res.status(400).json({ error: 'Nome da categoria é obrigatório.' });
+    }
+
+    const trimmedCategory = category.trim();
+    const config = await CategoryConfig.findOneAndUpdate(
+      { userId: req.user.id, category: trimmedCategory },
+      { $set: { icon: icon ? icon.trim() : '' } },
+      { new: true, upsert: true }
+    );
+
+    res.json({ message: 'Configuração de categoria salva com sucesso.', config });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao salvar configuração de categoria: ' + error.message });
+  }
+});
+
+// Rename a category globally for all user transactions and configurations
 router.put('/categories/rename', async (req, res) => {
   try {
     const { oldName, newName } = req.body;
@@ -157,7 +189,14 @@ router.put('/categories/rename', async (req, res) => {
     const trimmedOld = oldName.trim();
     const trimmedNew = newName.trim();
 
+    // 1. Update all transactions
     const result = await Transaction.updateMany(
+      { userId: req.user.id, category: trimmedOld },
+      { $set: { category: trimmedNew } }
+    );
+
+    // 2. Update category configuration if it exists
+    await CategoryConfig.updateOne(
       { userId: req.user.id, category: trimmedOld },
       { $set: { category: trimmedNew } }
     );

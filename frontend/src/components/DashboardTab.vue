@@ -107,6 +107,7 @@ onMounted(() => {
   fetchAnnualEvolution();
   fetchRegisteredCards();
   fetchDbCategories();
+  fetchCategoryConfigs();
 });
 
 // Watch month changes to reload transactions
@@ -265,6 +266,28 @@ const fetchDbCategories = async () => {
     }
   } catch (error) {
     console.error('Erro ao buscar categorias do banco:', error);
+  }
+};
+
+const fetchCategoryConfigs = async () => {
+  if (!props.token) return;
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/categories/configs`, {
+      headers: getHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const mapping = {};
+      data.forEach(item => {
+        if (item.category && item.icon) {
+          mapping[item.category] = item.icon;
+        }
+      });
+      customIcons.value = mapping;
+      localStorage.setItem('financas_category_icons', JSON.stringify(mapping));
+    }
+  } catch (error) {
+    console.error('Erro ao buscar configurações de categorias:', error);
   }
 };
 
@@ -804,19 +827,37 @@ const getCategoryIcon = (name) => {
 const availableIconsList = [
   'fa-utensils', 'fa-car', 'fa-gas-pump', 'fa-house', 'fa-umbrella-beach',
   'fa-heart-pulse', 'fa-graduation-cap', 'fa-repeat', 'fa-bag-shopping',
-  'fa-wallet', 'fa-money-bill-trend-up', 'fa-ellipsis', 'fa-gift',
+  'fa-shirt', 'fa-wallet', 'fa-money-bill-trend-up', 'fa-ellipsis', 'fa-gift',
   'fa-gamepad', 'fa-dumbbell', 'fa-paw', 'fa-plane', 'fa-bus',
   'fa-cart-shopping', 'fa-scissors', 'fa-wrench', 'fa-mobile-screen',
   'fa-bolt', 'fa-droplet', 'fa-tv', 'fa-briefcase', 'fa-piggy-bank',
   'fa-shield-halved', 'fa-tag'
 ];
 
-const selectCategoryIcon = (iconName) => {
+const selectCategoryIcon = async (iconName) => {
   if (!selectedCategoryName.value) return;
+  
   customIcons.value[selectedCategoryName.value] = iconName;
   localStorage.setItem('financas_category_icons', JSON.stringify(customIcons.value));
   showIconPicker.value = false;
-  emit('toast', { message: 'Ícone da categoria atualizado com sucesso!', type: 'success' });
+  
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/categories/configs`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        category: selectedCategoryName.value,
+        icon: iconName
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao salvar ícone no servidor');
+    }
+    emit('toast', { message: 'Ícone da categoria atualizado com sucesso!', type: 'success' });
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  }
 };
 
 const sortedCategories = computed(() => {
