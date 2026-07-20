@@ -341,6 +341,9 @@ a:hover {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .form-card {
+    position: static !important;
+  }
 }
 
 /* Input Form Card */

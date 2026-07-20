@@ -27,15 +27,15 @@ const calculateCompetenceMonth = async (userId, cardName, dateInput) => {
   const config = await CreditCard.findOne({ userId, cardName: cardName.trim() });
   if (config) {
     const closingDay = config.closingDay;
-    if (day <= closingDay) {
-      // It falls in the previous month's statement competence
-      let prevMonth = month - 1;
-      let prevYear = year;
-      if (prevMonth === 0) {
-        prevMonth = 12;
-        prevYear = year - 1;
+    if (day > closingDay) {
+      // It falls in the next month's statement competence
+      let nextMonth = month + 1;
+      let nextYear = year;
+      if (nextMonth === 13) {
+        nextMonth = 1;
+        nextYear = year + 1;
       }
-      return `${String(prevMonth).padStart(2, '0')}/${prevYear}`;
+      return `${String(nextMonth).padStart(2, '0')}/${nextYear}`;
     }
   }
   
