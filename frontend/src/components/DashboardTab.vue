@@ -410,7 +410,7 @@ const closeCategorizerModal = () => {
 const categoryTransactions = computed(() => {
   if (!selectedCategoryName.value) return [];
   return transactions.value.filter(t => 
-    (t.type === 'card' || t.type === 'variable') && 
+    t.type !== 'income' && 
     (t.category || 'Outros') === selectedCategoryName.value
   );
 });
@@ -917,7 +917,7 @@ const availableCategories = computed(() => {
 });
 
 const categoryBreakdown = computed(() => {
-  const expenseTransactions = transactions.value.filter(t => t.type === 'card' || t.type === 'variable');
+  const expenseTransactions = transactions.value.filter(t => t.type !== 'income');
   const totals = {};
   
   expenseTransactions.forEach(t => {
