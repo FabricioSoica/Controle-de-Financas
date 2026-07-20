@@ -100,6 +100,8 @@ router.post('/goal', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Erro ao salvar meta: ' + error.message });
   }
+});
+
 // Get all unique categories registered in any transaction for the user
 router.get('/categories', async (req, res) => {
   try {
