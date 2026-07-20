@@ -373,6 +373,36 @@ const editTransaction = (t) => {
   }, 50);
 };
 
+const showCategoryModal = ref(false);
+const selectedCategoryName = ref('');
+
+const categoryTransactions = computed(() => {
+  if (!selectedCategoryName.value) return [];
+  return transactions.value.filter(t => (t.category || 'Outros') === selectedCategoryName.value);
+});
+
+const openCategoryDetails = (name) => {
+  selectedCategoryName.value = name;
+  showCategoryModal.value = true;
+};
+
+const closeCategoryModal = () => {
+  showCategoryModal.value = false;
+  selectedCategoryName.value = '';
+};
+
+const handleEditFromModal = (t) => {
+  closeCategoryModal();
+  editTransaction(t);
+  setTimeout(() => {
+    document.querySelector('.form-card')?.scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+};
+
+const handleDeleteFromModal = (t) => {
+  deleteTransaction(t);
+};
+
 const showDeleteModal = ref(false);
 const transactionToDelete = ref(null);
 
@@ -1056,6 +1086,8 @@ const donutSegments = computed(() => {
                   :stroke-dashoffset="seg.strokeDashoffset" 
                   stroke-linecap="round"
                   class="donut-segment"
+                  @click="openCategoryDetails(seg.name)"
+                  style="cursor: pointer;"
                 />
               </svg>
               <div class="donut-center-text">
@@ -1067,7 +1099,13 @@ const donutSegments = computed(() => {
 
           <!-- Category Progress Bars -->
           <div class="category-bars-list custom-scroll">
-            <div v-for="cat in categoryBreakdown" :key="cat.name" class="category-bar-item">
+            <div 
+              v-for="cat in categoryBreakdown" 
+              :key="cat.name" 
+              class="category-bar-item"
+              @click="openCategoryDetails(cat.name)"
+              style="cursor: pointer;"
+            >
               <div class="cat-bar-header">
                 <div class="cat-bar-title">
                   <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(cat.name) + '22', color: getCategoryColor(cat.name) }">
@@ -1476,6 +1514,77 @@ const donutSegments = computed(() => {
           
           <button @click="closeDeleteModal" class="btn btn-secondary" type="button" style="min-height: 38px; width: 100%; justify-content: center; margin-top: 0.25rem;">
             Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beautiful Custom Modal for Viewing Category Transactions (Mercado Pago style) -->
+    <div v-if="showCategoryModal" class="modal-overlay" @click.self="closeCategoryModal">
+      <div class="modal-card" style="max-width: 600px; width: 95%;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem; color: var(--text-primary);">
+            <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName), width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+              <i class="fa-solid" :class="getCategoryIcon(selectedCategoryName)"></i>
+            </span>
+            <span>Gastos em: <strong>{{ selectedCategoryName }}</strong></span>
+          </h3>
+          <button @click="closeCategoryModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body" style="padding: 1.25rem 0; text-align: left;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem;">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">Total Consumido:</span>
+            <strong :style="{ color: getCategoryColor(selectedCategoryName), fontSize: '1.15rem', fontWeight: '800' }">
+              {{ formatCurrency(categoryTransactions.reduce((sum, t) => sum + t.amount, 0)) }}
+            </strong>
+          </div>
+          
+          <div v-if="categoryTransactions.length === 0" style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.9rem;">
+            Nenhum gasto registrado nesta categoria para este mês.
+          </div>
+          
+          <div v-else class="custom-scroll" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 0.25rem;">
+            <div v-for="t in categoryTransactions" :key="t._id" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); transition: background 0.2s ease;">
+              <div style="display: flex; flex-direction: column; gap: 0.15rem; flex-grow: 1; padding-right: 1rem;">
+                <div style="font-weight: 600; color: #fff; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                  <span>{{ t.description }}</span>
+                  <span v-if="t.installments > 1" class="subscription-badge" style="font-size: 0.65rem; color: #fff; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.2); padding: 0.05rem 0.25rem; border-radius: 4px;">
+                    Parcelado
+                  </span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                  <span v-if="t.type === 'card'" style="color: var(--color-danger);"><i class="fa-solid fa-credit-card"></i> {{ t.cardName }}</span>
+                  <span v-else-if="t.type === 'fixed'" style="color: var(--color-warning);"><i class="fa-solid fa-thumbtack"></i> Gasto Fixo</span>
+                  <span v-else style="color: var(--color-info);"><i class="fa-solid fa-tag"></i> Outro</span>
+                  
+                  <span v-if="t.info">• {{ t.info }}</span>
+                </div>
+              </div>
+              
+              <div style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
+                <span style="font-weight: 700; color: #fff; font-size: 0.9rem;">
+                  {{ formatCurrency(t.amount) }}
+                </span>
+                
+                <div style="display: flex; gap: 0.25rem;">
+                  <button @click="handleEditFromModal(t)" class="action-btn btn-edit" title="Editar" type="button" style="width: 28px; height: 28px; font-size: 0.75rem; padding: 0; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button @click="handleDeleteFromModal(t)" class="action-btn btn-delete" title="Deletar" type="button" style="width: 28px; height: 28px; font-size: 0.75rem; padding: 0; display: inline-flex; align-items: center; justify-content: center;">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
+          <button @click="closeCategoryModal" class="btn btn-secondary" type="button" style="min-height: 38px; padding: 0.5rem 1.5rem;">
+            Fechar
           </button>
         </div>
       </div>

@@ -102,6 +102,24 @@ router.post('/goal', async (req, res) => {
   }
 });
 
+// Get all uncategorized transactions (category = 'Outros' or empty) across all time for the user
+router.get('/uncategorized', async (req, res) => {
+  try {
+    const transactions = await Transaction.find({
+      userId: req.user.id,
+      $or: [
+        { category: 'Outros' },
+        { category: { $exists: false } },
+        { category: '' },
+        { category: null }
+      ]
+    }).sort({ createdAt: -1 });
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar transações descategorizadas: ' + error.message });
+  }
+});
+
 // Get all unique categories registered in any transaction for the user
 router.get('/categories', async (req, res) => {
   try {

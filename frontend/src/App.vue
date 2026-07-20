@@ -5,6 +5,7 @@ import DashboardTab from './components/DashboardTab.vue';
 import EvolutionTab from './components/EvolutionTab.vue';
 import ShoppingTab from './components/ShoppingTab.vue';
 import FuelTab from './components/FuelTab.vue';
+import CategoriesTab from './components/CategoriesTab.vue';
 
 const API_URL = import.meta.env.DEV ? 'http://localhost:5001' : '';
 
@@ -217,6 +218,14 @@ const handleUnauthorized = () => {
           >
             <i class="fa-solid fa-motorcycle"></i> Gasolina
           </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'categories' }" 
+            @click="activeTab = 'categories'"
+            type="button"
+          >
+            <i class="fa-solid fa-tags"></i> Categorizar
+          </button>
         </nav>
 
         <!-- User profile badge (only if authenticated) -->
@@ -270,6 +279,14 @@ const handleUnauthorized = () => {
       <!-- TAB 4: FUEL CONSUMPTION -->
       <FuelTab 
         v-if="activeTab === 'fuel'" 
+        :token="token"
+        :apiUrl="API_URL"
+        @toast="handleToast"
+      />
+
+      <!-- TAB 5: CATEGORIES RESOLUTION -->
+      <CategoriesTab 
+        v-if="activeTab === 'categories'" 
         :token="token"
         :apiUrl="API_URL"
         @toast="handleToast"
