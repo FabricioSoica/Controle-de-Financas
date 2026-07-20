@@ -119,7 +119,7 @@ router.get('/:month', async (req, res) => {
 // Add a transaction (with optional support for installments)
 router.post('/', async (req, res) => {
   try {
-    const { description, amount, type, month, info, cardName, installments } = req.body;
+    const { description, amount, type, month, info, cardName, installments, category } = req.body;
     if (!description || amount === undefined || !type || !month) {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: descrição, valor, tipo e mês são obrigatórios.' });
     }
@@ -165,7 +165,8 @@ router.post('/', async (req, res) => {
             type,
             cardName: finalCardName,
             month: targetMonth,
-            info: info || ''
+            info: info || '',
+            category: category || 'Outros'
           });
 
           const saved = await newTransaction.save();
@@ -184,7 +185,8 @@ router.post('/', async (req, res) => {
       type,
       cardName: finalCardName,
       month: monthFormatted,
-      info: info || ''
+      info: info || '',
+      category: category || 'Outros'
     });
 
     const savedTransaction = await newTransaction.save();
@@ -197,7 +199,7 @@ router.post('/', async (req, res) => {
 // Update a transaction
 router.put('/:id', async (req, res) => {
   try {
-    const { description, amount, type, month, info, cardName, installments } = req.body;
+    const { description, amount, type, month, info, cardName, installments, category } = req.body;
 
     // Fetch the original transaction to check its status
     const originalTrans = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
@@ -231,6 +233,7 @@ router.put('/:id', async (req, res) => {
       originalTrans.cardName = finalCardName;
       originalTrans.month = monthFormatted;
       originalTrans.info = info !== undefined ? info : originalTrans.info;
+      originalTrans.category = category !== undefined ? category : originalTrans.category;
 
       const updatedFirst = await originalTrans.save();
       const savedTransactions = [updatedFirst];
@@ -253,7 +256,8 @@ router.put('/:id', async (req, res) => {
           type: 'card',
           cardName: finalCardName,
           month: targetMonth,
-          info: info !== undefined ? info : (originalTrans.info || '')
+          info: info !== undefined ? info : (originalTrans.info || ''),
+          category: category !== undefined ? category : (originalTrans.category || 'Outros')
         });
 
         const saved = await newTransaction.save();
@@ -270,6 +274,7 @@ router.put('/:id', async (req, res) => {
     if (type !== undefined) updatedFields.type = type;
     if (month !== undefined) updatedFields.month = month.replace(/[-_]/g, '/');
     if (info !== undefined) updatedFields.info = info;
+    if (category !== undefined) updatedFields.category = category;
 
     if (targetType === 'card' || targetType === 'fixed') {
       if (cardName !== undefined) {

@@ -28,6 +28,21 @@ const transInfo = ref('');
 const transInstallments = ref(1);
 const isOldInstallment = ref(false);
 const currentInstallmentNumber = ref(1);
+const transCategory = ref('Outros');
+let isPopulatingEdit = false;
+
+watch(transType, (newType) => {
+  if (isPopulatingEdit) return;
+  if (newType === 'income') {
+    if (transCategory.value !== 'Salário' && transCategory.value !== 'Outras Receitas') {
+      transCategory.value = 'Salário';
+    }
+  } else {
+    if (transCategory.value === 'Salário' || transCategory.value === 'Outras Receitas') {
+      transCategory.value = 'Outros';
+    }
+  }
+});
 const targetNetResult = ref(0);
 const showGoalModal = ref(false);
 const tempGoalValue = ref('');
@@ -273,7 +288,8 @@ const saveTransaction = async () => {
     type: transType.value,
     cardName: (transType.value === 'card' || transType.value === 'fixed') ? transCardName.value.trim() : '',
     month: getMonthYearString(selectedMonth.value),
-    info: transInfo.value
+    info: transInfo.value,
+    category: transCategory.value
   };
 
   if (transType.value === 'card' && transInstallments.value > 1) {
@@ -322,16 +338,21 @@ const saveTransaction = async () => {
 };
 
 const editTransaction = (t) => {
+  isPopulatingEdit = true;
   transId.value = t._id;
   transDesc.value = t.description;
   transAmount.value = t.amount;
   transType.value = t.type;
   transCardName.value = t.cardName || '';
   transInfo.value = t.info || '';
+  transCategory.value = t.category || 'Outros';
   transInstallments.value = 1;
   isOldInstallment.value = false;
   currentInstallmentNumber.value = 1;
   isEditingTrans.value = true;
+  setTimeout(() => {
+    isPopulatingEdit = false;
+  }, 50);
 };
 
 const showDeleteModal = ref(false);
@@ -386,6 +407,7 @@ const resetTransForm = () => {
   transType.value = 'card';
   transCardName.value = '';
   transInfo.value = '';
+  transCategory.value = 'Outros';
   transInstallments.value = 1;
   isOldInstallment.value = false;
   currentInstallmentNumber.value = 1;
@@ -645,6 +667,84 @@ const getCardUsagePercentage = (cardTotal) => {
   if (totalInvoiceSum.value === 0) return 0;
   return (cardTotal / totalInvoiceSum.value) * 100;
 };
+
+const categoryMetadata = {
+  'Alimentação': { icon: 'fa-utensils', color: '#ff6b6b' },
+  'Transporte': { icon: 'fa-car', color: '#4dadf7' },
+  'Combustível': { icon: 'fa-gas-pump', color: '#fcc419' },
+  'Moradia': { icon: 'fa-house', color: '#51cf66' },
+  'Lazer / Viagens': { icon: 'fa-umbrella-beach', color: '#cc5de8' },
+  'Saúde': { icon: 'fa-heart-pulse', color: '#ff8787' },
+  'Educação': { icon: 'fa-graduation-cap', color: '#ff922b' },
+  'Assinaturas & Serviços': { icon: 'fa-repeat', color: '#3bc9db' },
+  'Compras / Vestuário': { icon: 'fa-bag-shopping', color: '#94d82d' },
+  'Outros': { icon: 'fa-ellipsis', color: '#adb5bd' },
+  'Salário': { icon: 'fa-wallet', color: '#37b24d' },
+  'Outras Receitas': { icon: 'fa-money-bill-trend-up', color: '#74b816' }
+};
+
+const getCategoryIcon = (name) => {
+  return categoryMetadata[name]?.icon || 'fa-ellipsis';
+};
+
+const getCategoryColor = (name) => {
+  return categoryMetadata[name]?.color || '#adb5bd';
+};
+
+const categoryBreakdown = computed(() => {
+  const expenseTransactions = transactions.value.filter(t => t.type !== 'income');
+  const totals = {};
+  
+  expenseTransactions.forEach(t => {
+    const cat = t.category || 'Outros';
+    if (!totals[cat]) {
+      totals[cat] = {
+        name: cat,
+        total: 0,
+        count: 0
+      };
+    }
+    totals[cat].total += t.amount;
+    totals[cat].count++;
+  });
+  
+  const sorted = Object.values(totals).sort((a, b) => b.total - a.total);
+  const sumExpenses = sorted.reduce((sum, item) => sum + item.total, 0);
+  
+  return sorted.map(item => {
+    return {
+      ...item,
+      percentage: sumExpenses > 0 ? (item.total / sumExpenses) * 100 : 0
+    };
+  });
+});
+
+const totalBreakdownExpenses = computed(() => {
+  return categoryBreakdown.value.reduce((sum, item) => sum + item.total, 0);
+});
+
+const donutSegments = computed(() => {
+  let accumulatedPercent = 0;
+  const R = 40;
+  const C = 2 * Math.PI * R; // 251.327
+  
+  return categoryBreakdown.value.map(item => {
+    const percent = item.percentage;
+    const strokeDasharray = `${(percent / 100) * C} ${C}`;
+    const strokeDashoffset = -((accumulatedPercent / 100) * C);
+    accumulatedPercent += percent;
+    
+    return {
+      name: item.name,
+      total: item.total,
+      percent: percent,
+      color: getCategoryColor(item.name),
+      icon: getCategoryIcon(item.name),
+      strokeDasharray,
+      strokeDashoffset
+    };
+  });
+});
 </script>
 
 <template>
@@ -832,51 +932,115 @@ const getCardUsagePercentage = (cardTotal) => {
       </div>
     </div>
 
-    <!-- CREDIT CARDS BREAKDOWN SECTION -->
-    <section v-if="cardsBreakdown.length > 0" class="card-breakdown-section">
-      <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); margin-top: 0;">
-        <i class="fa-solid fa-credit-card" style="color: var(--color-danger);"></i>
-        Detalhamento por Cartão de Crédito
-      </h3>
-      <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Gasto detalhado de cada cartão no mês selecionado. Clique sobre o cartão para ver a lista de compras.</p>
+    <!-- STATS BREAKDOWN GRID (Cards & Categories) -->
+    <div v-if="cardsBreakdown.length > 0 || categoryBreakdown.length > 0" class="stats-breakdown-grid">
       
-      <div class="cards-container">
-        <div v-for="card in cardsBreakdown" :key="card.name" class="credit-card-panel">
-          <!-- Accordion Header -->
-          <div class="cc-header" @click="toggleCardAccordion(card.name)">
-            <div class="cc-title">
-              <i class="fa-solid fa-wallet" style="color: var(--color-primary); font-size: 0.85rem;"></i>
-              <span>{{ card.name }}</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span class="cc-total">{{ formatCurrency(card.total) }}</span>
-              <i class="fa-solid fa-chevron-down cc-chevron" :class="{ open: openedCards[card.name] }"></i>
-            </div>
-          </div>
-
-          <!-- Custom Progress Bar -->
-          <div class="cc-progress-bar-container">
-            <div class="cc-progress-bar" :style="{ width: getCardUsagePercentage(card.total) + '%' }"></div>
-          </div>
-
-          <!-- Accordion Collapsible Detail list -->
-          <div v-if="openedCards[card.name]" class="cc-details custom-scroll">
-            <div v-for="item in card.transactions" :key="item._id" class="cc-detail-item">
-              <div style="display: flex; flex-direction: column; gap: 0.1rem;">
-                <span class="cc-detail-desc">
-                  {{ item.description }}
-                  <span v-if="item.isSubscription" class="subscription-badge" style="font-size: 0.6rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.08); padding: 0.05rem 0.25rem; border-radius: 3px; margin-left: 0.25rem;">
-                    Fixo
-                  </span>
-                </span>
-                <span v-if="item.info" style="font-size: 0.65rem; color: var(--text-muted); font-style: italic;">{{ item.info }}</span>
+      <!-- Left Column: Credit Cards Breakdown -->
+      <section v-if="cardsBreakdown.length > 0" class="card-breakdown-section">
+        <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); margin-top: 0;">
+          <i class="fa-solid fa-credit-card" style="color: var(--color-danger);"></i>
+          Detalhamento por Cartão de Crédito
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Gasto detalhado de cada cartão no mês selecionado. Clique sobre o cartão para ver a lista de compras.</p>
+        
+        <div class="cards-container">
+          <div v-for="card in cardsBreakdown" :key="card.name" class="credit-card-panel">
+            <!-- Accordion Header -->
+            <div class="cc-header" @click="toggleCardAccordion(card.name)">
+              <div class="cc-title">
+                <i class="fa-solid fa-wallet" style="color: var(--color-primary); font-size: 0.85rem;"></i>
+                <span>{{ card.name }}</span>
               </div>
-              <span class="cc-detail-val">{{ formatCurrency(item.amount) }}</span>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span class="cc-total">{{ formatCurrency(card.total) }}</span>
+                <i class="fa-solid fa-chevron-down cc-chevron" :class="{ open: openedCards[card.name] }"></i>
+              </div>
+            </div>
+
+            <!-- Custom Progress Bar -->
+            <div class="cc-progress-bar-container">
+              <div class="cc-progress-bar" :style="{ width: getCardUsagePercentage(card.total) + '%' }"></div>
+            </div>
+
+            <!-- Accordion Collapsible Detail list -->
+            <div v-if="openedCards[card.name]" class="cc-details custom-scroll">
+              <div v-for="item in card.transactions" :key="item._id" class="cc-detail-item">
+                <div style="display: flex; flex-direction: column; gap: 0.1rem;">
+                  <span class="cc-detail-desc">
+                    {{ item.description }}
+                    <span v-if="item.isSubscription" class="subscription-badge" style="font-size: 0.6rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.08); padding: 0.05rem 0.25rem; border-radius: 3px; margin-left: 0.25rem;">
+                      Fixo
+                    </span>
+                  </span>
+                  <span v-if="item.info" style="font-size: 0.65rem; color: var(--text-muted); font-style: italic;">{{ item.info }}</span>
+                </div>
+                <span class="cc-detail-val">{{ formatCurrency(item.amount) }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <!-- Right Column: Expense Breakdown by Category -->
+      <section v-if="categoryBreakdown.length > 0" class="category-breakdown-section">
+        <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); margin-top: 0;">
+          <i class="fa-solid fa-chart-pie" style="color: var(--color-success);"></i>
+          Distribuição por Categoria
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Detalhamento visual de gastos (fixos, cartões e outros).</p>
+        
+        <div class="category-stats-container">
+          <!-- Donut Chart & Summary -->
+          <div class="donut-chart-wrapper">
+            <div class="donut-chart-container">
+              <svg width="140" height="140" viewBox="0 0 100 100" class="donut-svg">
+                <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.06)" stroke-width="12" />
+                <circle 
+                  v-for="seg in donutSegments" 
+                  :key="seg.name"
+                  cx="50" 
+                  cy="50" 
+                  r="40" 
+                  fill="transparent" 
+                  :stroke="seg.color" 
+                  stroke-width="12" 
+                  :stroke-dasharray="seg.strokeDasharray" 
+                  :stroke-dashoffset="seg.strokeDashoffset" 
+                  stroke-linecap="round"
+                  class="donut-segment"
+                />
+              </svg>
+              <div class="donut-center-text">
+                <span class="donut-label">Total Saídas</span>
+                <span class="donut-val">{{ formatCurrency(totalBreakdownExpenses) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category Progress Bars -->
+          <div class="category-bars-list custom-scroll">
+            <div v-for="cat in categoryBreakdown" :key="cat.name" class="category-bar-item">
+              <div class="cat-bar-header">
+                <div class="cat-bar-title">
+                  <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(cat.name) + '22', color: getCategoryColor(cat.name) }">
+                    <i class="fa-solid" :class="getCategoryIcon(cat.name)"></i>
+                  </span>
+                  <span class="cat-name">{{ cat.name }}</span>
+                </div>
+                <div class="cat-bar-values">
+                  <span class="cat-total">{{ formatCurrency(cat.total) }}</span>
+                  <span class="cat-pct">{{ cat.percentage.toFixed(0) }}%</span>
+                </div>
+              </div>
+              <div class="cat-progress-bg">
+                <div class="cat-progress-fill" :style="{ width: cat.percentage + '%', backgroundColor: getCategoryColor(cat.name) }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
 
     <!-- Dashboard Split Layout -->
     <div class="dashboard-grid">
@@ -994,6 +1158,28 @@ const getCardUsagePercentage = (cardTotal) => {
                 </span>
               </div>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <select v-model="transCategory" class="form-select" required>
+              <template v-if="transType === 'income'">
+                <option value="Salário">Salário</option>
+                <option value="Outras Receitas">Outras Receitas</option>
+              </template>
+              <template v-else>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Combustível">Combustível</option>
+                <option value="Moradia">Moradia</option>
+                <option value="Lazer / Viagens">Lazer / Viagens</option>
+                <option value="Saúde">Saúde</option>
+                <option value="Educação">Educação</option>
+                <option value="Assinaturas & Serviços">Assinaturas & Serviços</option>
+                <option value="Compras / Vestuário">Compras / Vestuário</option>
+                <option value="Outros">Outros</option>
+              </template>
+            </select>
           </div>
 
           <div class="form-group">

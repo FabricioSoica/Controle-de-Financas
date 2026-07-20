@@ -35,6 +35,12 @@ const TransactionSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: ''
+  },
+  category: {
+    type: String,
+    required: true,
+    default: 'Outros',
+    trim: true
   }
 }, {
   timestamps: true

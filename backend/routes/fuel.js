@@ -157,7 +157,8 @@ router.post('/', async (req, res) => {
         type: 'card',
         cardName: cardName.trim(),
         month: competenceMonth,
-        info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`
+        info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`,
+        category: 'Combustível'
       });
       
       const savedTrans = await newTrans.save();
@@ -221,7 +222,8 @@ router.put('/:id', async (req, res) => {
         type: 'card',
         cardName: newCardName.trim(),
         month: competenceMonth,
-        info: `Abastecimento de ${newLiters.toFixed(1)}L (Odômetro: ${newOdometer.toLocaleString('pt-BR')} km)`
+        info: `Abastecimento de ${newLiters.toFixed(1)}L (Odômetro: ${newOdometer.toLocaleString('pt-BR')} km)`,
+        category: 'Combustível'
       };
       
       if (oldPaymentType === 'card' && transactionId) {

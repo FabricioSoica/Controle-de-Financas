@@ -132,6 +132,65 @@ const migrateCreditCards = async () => {
   }
 };
 
+const migrateCategories = async () => {
+  try {
+    const transactions = await Transaction.find({
+      $or: [
+        { category: { $exists: false } },
+        { category: 'Outros' }
+      ]
+    });
+    
+    if (transactions.length === 0) return;
+    
+    let updatedCount = 0;
+    for (const t of transactions) {
+      const desc = (t.description || '').toLowerCase();
+      let cat = 'Outros';
+      
+      if (t.type === 'income') {
+        if (desc.includes('salario') || desc.includes('salário') || desc.includes('pagamento') || desc.includes('tae') || desc.includes('taekwondo')) {
+          cat = 'Salário';
+        } else {
+          cat = 'Outras Receitas';
+        }
+      } else {
+        if (desc.includes('gasolina') || desc.includes('abastecer') || desc.includes('combustivel') || desc.includes('combustível')) {
+          cat = 'Combustível';
+        } else if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('amazon') || desc.includes('prime') || desc.includes('hbo') || desc.includes('disney') || desc.includes('youtube') || desc.includes('apple') || desc.includes('icloud') || desc.includes('github') || desc.includes('assinatura')) {
+          cat = 'Assinaturas & Serviços';
+        } else if (desc.includes('mercado') || desc.includes('ifood') || desc.includes('restaurante') || desc.includes('comida') || desc.includes('padaria') || desc.includes('pao') || desc.includes('pão') || desc.includes('açougue') || desc.includes('acougue')) {
+          cat = 'Alimentação';
+        } else if (desc.includes('uber') || desc.includes('99taxi') || desc.includes('bus') || desc.includes('passagem') || desc.includes('pedagio') || desc.includes('pedágio')) {
+          cat = 'Transporte';
+        } else if (desc.includes('aluguel') || desc.includes('condominio') || desc.includes('condomínio') || desc.includes('energia') || desc.includes('luz') || desc.includes('agua') || desc.includes('água') || desc.includes('internet') || desc.includes('iptu')) {
+          cat = 'Moradia';
+        } else if (desc.includes('cinema') || desc.includes('show') || desc.includes('viagem') || desc.includes('hotel') || desc.includes('cerveja') || desc.includes('chope') || desc.includes('bar') || desc.includes('praia')) {
+          cat = 'Lazer / Viagens';
+        } else if (desc.includes('farmacia') || desc.includes('farmácia') || desc.includes('medico') || desc.includes('médico') || desc.includes('hospital') || desc.includes('consulta') || desc.includes('remedio') || desc.includes('remédio') || desc.includes('dentista')) {
+          cat = 'Saúde';
+        } else if (desc.includes('curso') || desc.includes('faculdade') || desc.includes('escola') || desc.includes('livro') || desc.includes('mensalidade')) {
+          cat = 'Educação';
+        } else if (desc.includes('roupa') || desc.includes('calcado') || desc.includes('calçado') || desc.includes('tenis') || desc.includes('tênis') || desc.includes('shopee') || desc.includes('aliexpress') || desc.includes('shein') || desc.includes('mercado livre') || desc.includes('loja')) {
+          cat = 'Compras / Vestuário';
+        }
+      }
+      
+      if (t.category !== cat) {
+        t.category = cat;
+        await t.save();
+        updatedCount++;
+      }
+    }
+    
+    if (updatedCount > 0) {
+      console.log(`[Migration] Categorized ${updatedCount} transactions.`);
+    }
+  } catch (err) {
+    console.error('[Migration] Error migrating categories:', err);
+  }
+};
+
 const connectDB = async () => {
   const MONGO_URI = process.env.MONGO_URI;
   if (!MONGO_URI) {
@@ -146,6 +205,8 @@ const connectDB = async () => {
     await migrateOrphans();
     // Run DB migrations for credit cards
     await migrateCreditCards();
+    // Run DB migrations for categories
+    await migrateCategories();
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1);
@@ -155,5 +216,6 @@ const connectDB = async () => {
 module.exports = {
   connectDB,
   migrateOrphans,
-  migrateCreditCards
+  migrateCreditCards,
+  migrateCategories
 };
