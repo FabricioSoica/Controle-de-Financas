@@ -105,6 +105,7 @@ onMounted(() => {
   fetchMonthlyGoal();
   fetchAnnualEvolution();
   fetchRegisteredCards();
+  fetchDbCategories();
 });
 
 // Watch month changes to reload transactions
@@ -250,6 +251,22 @@ const cumulativeYearNetResult = computed(() => {
 // ==========================================
 // API Operations
 // ==========================================
+const dbCategories = ref([]);
+
+const fetchDbCategories = async () => {
+  if (!props.token) return;
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/categories`, {
+      headers: getHeaders()
+    });
+    if (res.ok) {
+      dbCategories.value = await res.json();
+    }
+  } catch (error) {
+    console.error('Erro ao buscar categorias do banco:', error);
+  }
+};
+
 const fetchTransactions = async () => {
   if (!props.token) return;
   try {
@@ -332,6 +349,7 @@ const saveTransaction = async () => {
     resetTransForm();
     fetchTransactions();
     fetchAnnualEvolution();
+    fetchDbCategories();
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   }
@@ -383,6 +401,7 @@ const executeDelete = async (id, deleteAll) => {
     });
     fetchTransactions();
     fetchAnnualEvolution();
+    fetchDbCategories();
   } catch (error) {
     emit('toast', { message: error.message, type: 'error' });
   }
