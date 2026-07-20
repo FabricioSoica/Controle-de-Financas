@@ -186,6 +186,33 @@ const migrateCategories = async () => {
     if (updatedCount > 0) {
       console.log(`[Migration] Categorized ${updatedCount} transactions.`);
     }
+
+    // Sync installments categories that might have been partially categorized
+    const categorizedInstallments = await Transaction.find({
+      type: 'card',
+      description: { $regex: / \(\d{2}\/\d{2}\)$/ },
+      category: { $ne: 'Outros', $exists: true }
+    });
+
+    let syncCount = 0;
+    for (const t of categorizedInstallments) {
+      const baseName = t.description.split(' (')[0].trim();
+      const escapedName = baseName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      
+      const result = await Transaction.updateMany({
+        userId: t.userId,
+        type: 'card',
+        cardName: t.cardName,
+        description: { $regex: new RegExp('^' + escapedName + ' \\(') },
+        category: { $ne: t.category }
+      }, {
+        $set: { category: t.category }
+      });
+      syncCount += result.modifiedCount;
+    }
+    if (syncCount > 0) {
+      console.log(`[Migration] Synchronized category for ${syncCount} matching installments.`);
+    }
   } catch (err) {
     console.error('[Migration] Error migrating categories:', err);
   }

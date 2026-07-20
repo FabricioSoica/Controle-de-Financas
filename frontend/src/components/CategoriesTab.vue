@@ -138,17 +138,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="categories-tab-container" style="max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem;">
-    <!-- Title Section -->
-    <div style="margin-bottom: 2rem;">
-      <h2 style="margin: 0 0 0.5rem 0; font-size: 1.6rem; color: #fff; display: flex; align-items: center; gap: 0.75rem;">
-        <i class="fa-solid fa-tags" style="color: var(--color-primary);"></i>
-        Categorizador de Gastos
-      </h2>
-      <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.4;">
-        Organize seus lançamentos marcados como "Outros" ou descategorizados. Isso manterá os gráficos do seu Dashboard atualizados e precisos.
-      </p>
-    </div>
+  <div class="categories-tab-container" style="max-width: 1000px; margin: 0 auto; padding: 0.5rem 1rem;">
 
     <!-- Quick Stats Card -->
     <div class="stats-panel" style="margin-bottom: 2rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">

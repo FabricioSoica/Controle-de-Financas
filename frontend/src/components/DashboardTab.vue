@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import CategoriesTab from './CategoriesTab.vue';
 
 const props = defineProps({
   token: {
@@ -375,6 +376,13 @@ const editTransaction = (t) => {
 
 const showCategoryModal = ref(false);
 const selectedCategoryName = ref('');
+const showCategorizerModal = ref(false);
+
+const closeCategorizerModal = () => {
+  showCategorizerModal.value = false;
+  fetchTransactions();
+  fetchDbCategories();
+};
 
 const categoryTransactions = computed(() => {
   if (!selectedCategoryName.value) return [];
@@ -1061,10 +1069,23 @@ const donutSegments = computed(() => {
 
       <!-- Right Column: Expense Breakdown by Category -->
       <section v-if="categoryBreakdown.length > 0" class="category-breakdown-section">
-        <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); margin-top: 0;">
-          <i class="fa-solid fa-chart-pie" style="color: var(--color-success);"></i>
-          Distribuição por Categoria
-        </h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); margin: 0;">
+            <i class="fa-solid fa-chart-pie" style="color: var(--color-success);"></i>
+            Distribuição por Categoria
+          </h3>
+          <button 
+            @click="showCategorizerModal = true" 
+            class="btn btn-secondary" 
+            style="padding: 0.35rem 0.75rem; font-size: 0.8rem; min-height: 30px; display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #fff;"
+            type="button"
+            onmouseover="this.style.background='rgba(99, 102, 241, 0.2)'"
+            onmouseout="this.style.background='rgba(99, 102, 241, 0.1)'"
+          >
+            <i class="fa-solid fa-tags"></i>
+            Categorizar
+          </button>
+        </div>
         <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">Detalhamento visual de gastos (fixos, cartões e outros).</p>
         
         <div class="category-stats-container">
@@ -1584,6 +1605,35 @@ const donutSegments = computed(() => {
         
         <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
           <button @click="closeCategoryModal" class="btn btn-secondary" type="button" style="min-height: 38px; padding: 0.5rem 1.5rem;">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beautiful Custom Modal for Bulk Categorizing Uncategorized Transactions -->
+    <div v-if="showCategorizerModal" class="modal-overlay" @click.self="closeCategorizerModal">
+      <div class="modal-card" style="max-width: 900px; width: 95%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; padding: 1.5rem;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; flex-shrink: 0;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.2rem; color: var(--text-primary);">
+            <i class="fa-solid fa-tags" style="color: var(--color-primary);"></i>
+            <span>Categorizar Gastos Pendentes</span>
+          </h3>
+          <button @click="closeCategorizerModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body custom-scroll" style="flex-grow: 1; overflow-y: auto; padding: 1.25rem 0 0.5rem 0;">
+          <CategoriesTab 
+            :token="token" 
+            :apiUrl="apiUrl" 
+            @toast="(payload) => $emit('toast', payload)" 
+          />
+        </div>
+        
+        <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding-top: 0.75rem; display: flex; justify-content: flex-end; flex-shrink: 0;">
+          <button @click="closeCategorizerModal" class="btn btn-secondary" type="button" style="min-height: 38px; padding: 0.5rem 1.5rem;">
             Fechar
           </button>
         </div>

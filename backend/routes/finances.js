@@ -114,7 +114,23 @@ router.get('/uncategorized', async (req, res) => {
         { category: null }
       ]
     }).sort({ createdAt: -1 });
-    res.json(transactions);
+
+    const seenInstallments = new Set();
+    const filtered = [];
+
+    for (const t of transactions) {
+      if (t.type === 'card' && t.description.includes(' (')) {
+        const baseName = t.description.split(' (')[0].trim();
+        const key = `${t.cardName || 'Geral'}_${baseName}`;
+        if (seenInstallments.has(key)) {
+          continue;
+        }
+        seenInstallments.add(key);
+      }
+      filtered.push(t);
+    }
+
+    res.json(filtered);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar transações descategorizadas: ' + error.message });
   }
@@ -319,6 +335,23 @@ router.put('/:id', async (req, res) => {
       { $set: updatedFields },
       { new: true, runValidators: true }
     );
+
+    // If we updated the category of an installment, update all other installments of the same chain
+    if (category !== undefined && originalTrans.type === 'card' && originalTrans.description.includes(' (')) {
+      const baseName = originalTrans.description.split(' (')[0].trim();
+      const escapedName = baseName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      
+      await Transaction.updateMany(
+        {
+          userId: req.user.id,
+          type: 'card',
+          cardName: originalTrans.cardName,
+          description: { $regex: new RegExp('^' + escapedName + ' \\(') }
+        },
+        { $set: { category } }
+      );
+    }
+
     res.json(updatedTransaction);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar lançamento: ' + error.message });
