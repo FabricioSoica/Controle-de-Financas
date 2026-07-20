@@ -146,6 +146,31 @@ router.get('/categories', async (req, res) => {
   }
 });
 
+// Rename a category globally for all user transactions
+router.put('/categories/rename', async (req, res) => {
+  try {
+    const { oldName, newName } = req.body;
+    if (!oldName || !newName || !oldName.trim() || !newName.trim()) {
+      return res.status(400).json({ error: 'Nomes antigo e novo da categoria são obrigatórios.' });
+    }
+
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+
+    const result = await Transaction.updateMany(
+      { userId: req.user.id, category: trimmedOld },
+      { $set: { category: trimmedNew } }
+    );
+
+    res.json({ 
+      message: `Categoria renomeada de "${trimmedOld}" para "${trimmedNew}" com sucesso.`, 
+      modifiedCount: result.modifiedCount 
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao renomear categoria: ' + error.message });
+  }
+});
+
 // Get all transactions for a specific month (e.g. "06/2026")
 router.get('/:month', async (req, res) => {
   try {

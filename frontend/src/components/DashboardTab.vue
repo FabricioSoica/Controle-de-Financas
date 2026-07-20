@@ -392,6 +392,52 @@ const categoryTransactions = computed(() => {
   );
 });
 
+const isEditingCategoryName = ref(false);
+const newCategoryNameInput = ref('');
+
+const startRenameCategory = () => {
+  newCategoryNameInput.value = selectedCategoryName.value;
+  isEditingCategoryName.value = true;
+};
+
+const executeRenameCategory = async () => {
+  if (!newCategoryNameInput.value || !newCategoryNameInput.value.trim()) {
+    emit('toast', { message: 'Por favor, digite um nome de categoria válido.', type: 'error' });
+    return;
+  }
+  
+  const oldName = selectedCategoryName.value;
+  const newName = newCategoryNameInput.value.trim();
+  
+  if (oldName === newName) {
+    isEditingCategoryName.value = false;
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${props.apiUrl}/api/finances/categories/rename`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ oldName, newName })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao renomear categoria');
+    }
+    
+    emit('toast', { message: `Categoria renomeada para "${newName}" com sucesso!`, type: 'success' });
+    
+    selectedCategoryName.value = newName;
+    isEditingCategoryName.value = false;
+    
+    fetchTransactions();
+    fetchDbCategories();
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  }
+};
+
 const openCategoryDetails = (name) => {
   selectedCategoryName.value = name;
   showCategoryModal.value = true;
@@ -400,6 +446,8 @@ const openCategoryDetails = (name) => {
 const closeCategoryModal = () => {
   showCategoryModal.value = false;
   selectedCategoryName.value = '';
+  isEditingCategoryName.value = false;
+  newCategoryNameInput.value = '';
 };
 
 const handleEditFromModal = (t) => {
@@ -1547,11 +1595,41 @@ const donutSegments = computed(() => {
     <div v-if="showCategoryModal" class="modal-overlay" @click.self="closeCategoryModal">
       <div class="modal-card" style="max-width: 600px; width: 95%;">
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
-          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem; color: var(--text-primary);">
-            <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName), width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem; color: var(--text-primary); flex-grow: 1; min-width: 0;">
+            <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName), width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }">
               <i class="fa-solid" :class="getCategoryIcon(selectedCategoryName)"></i>
             </span>
-            <span>Gastos em: <strong>{{ selectedCategoryName }}</strong></span>
+            
+            <div v-if="isEditingCategoryName" style="display: flex; gap: 0.35rem; align-items: center; flex-grow: 1; max-width: 320px;">
+              <input 
+                type="text" 
+                v-model="newCategoryNameInput" 
+                class="form-input" 
+                style="margin: 0; min-height: 32px; font-size: 0.85rem; padding: 0.25rem 0.5rem; flex-grow: 1; background: rgba(255,255,255,0.05); border-color: var(--border-color); color: #fff;"
+                @keyup.enter="executeRenameCategory"
+                placeholder="Novo nome..."
+              />
+              <button @click="executeRenameCategory" class="btn btn-primary" type="button" style="padding: 0; width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; background: var(--color-success); border-color: var(--color-success);">
+                <i class="fa-solid fa-check"></i>
+              </button>
+              <button @click="isEditingCategoryName = false" class="btn btn-secondary" type="button" style="padding: 0; width: 32px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center;">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            
+            <div v-else style="display: flex; align-items: center; gap: 0.4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span>Gastos em: <strong>{{ selectedCategoryName }}</strong></span>
+              <button 
+                @click="startRenameCategory" 
+                title="Renomear Categoria" 
+                type="button" 
+                style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; padding: 0.25rem; display: inline-flex; align-items: center; justify-content: center; transition: var(--transition-smooth);"
+                onmouseover="this.style.color='var(--color-primary)'" 
+                onmouseout="this.style.color='var(--text-muted)'"
+              >
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+            </div>
           </h3>
           <button @click="closeCategoryModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
             <i class="fa-solid fa-xmark"></i>
