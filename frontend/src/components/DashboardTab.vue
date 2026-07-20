@@ -448,6 +448,7 @@ const closeCategoryModal = () => {
   selectedCategoryName.value = '';
   isEditingCategoryName.value = false;
   newCategoryNameInput.value = '';
+  showIconPicker.value = false;
 };
 
 const handleEditFromModal = (t) => {
@@ -791,22 +792,68 @@ const categoryMetadata = {
   'Outras Receitas': { icon: 'fa-money-bill-trend-up', color: '#74b816' }
 };
 
+const customIcons = ref(JSON.parse(localStorage.getItem('financas_category_icons') || '{}'));
+const showIconPicker = ref(false);
+
 const getCategoryIcon = (name) => {
   if (!name) return 'fa-tag';
+  if (customIcons.value[name]) return customIcons.value[name];
   return categoryMetadata[name]?.icon || 'fa-tag';
 };
+
+const availableIconsList = [
+  'fa-utensils', 'fa-car', 'fa-gas-pump', 'fa-house', 'fa-umbrella-beach',
+  'fa-heart-pulse', 'fa-graduation-cap', 'fa-repeat', 'fa-bag-shopping',
+  'fa-wallet', 'fa-money-bill-trend-up', 'fa-ellipsis', 'fa-gift',
+  'fa-gamepad', 'fa-dumbbell', 'fa-paw', 'fa-plane', 'fa-bus',
+  'fa-cart-shopping', 'fa-scissors', 'fa-wrench', 'fa-mobile-screen',
+  'fa-bolt', 'fa-droplet', 'fa-tv', 'fa-briefcase', 'fa-piggy-bank',
+  'fa-shield-halved', 'fa-tag'
+];
+
+const selectCategoryIcon = (iconName) => {
+  if (!selectedCategoryName.value) return;
+  customIcons.value[selectedCategoryName.value] = iconName;
+  localStorage.setItem('financas_category_icons', JSON.stringify(customIcons.value));
+  showIconPicker.value = false;
+  emit('toast', { message: 'Ícone da categoria atualizado com sucesso!', type: 'success' });
+};
+
+const sortedCategories = computed(() => {
+  const list = new Set();
+  
+  const defaultCats = [
+    'Alimentação', 'Transporte', 'Combustível', 'Moradia', 
+    'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 
+    'Compras / Vestuário', 'Outros', 'Salário', 'Outras Receitas'
+  ];
+  defaultCats.forEach(c => list.add(c));
+  
+  transactions.value.forEach(t => {
+    if (t.category) list.add(t.category);
+  });
+  
+  dbCategories.value.forEach(c => list.add(c));
+  
+  return [...list].sort();
+});
 
 const getCategoryColor = (name) => {
   if (!name) return '#adb5bd';
   if (categoryMetadata[name]) return categoryMetadata[name].color;
   
-  // Deterministic HSL color based on string hashing
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const index = sortedCategories.value.indexOf(name);
+  if (index === -1) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 65%, 60%)`;
   }
-  const hue = Math.abs(hash % 360);
-  return `hsl(${hue}, 65%, 60%)`;
+  
+  const hue = (index * 137.5) % 360;
+  return `hsl(${hue}, 70%, 55%)`;
 };
 
 const availableCategories = computed(() => {
@@ -1596,7 +1643,7 @@ const donutSegments = computed(() => {
       <div class="modal-card" style="max-width: 600px; width: 95%;">
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
           <h3 style="margin: 0; display: flex; align-items: center; gap: 0.6rem; font-size: 1.15rem; color: var(--text-primary); flex-grow: 1; min-width: 0;">
-            <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName), width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }">
+            <span class="cat-icon-badge" :style="{ backgroundColor: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName), width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }" @click="showIconPicker = !showIconPicker" title="Alterar Ícone">
               <i class="fa-solid" :class="getCategoryIcon(selectedCategoryName)"></i>
             </span>
             
@@ -1637,6 +1684,26 @@ const donutSegments = computed(() => {
         </div>
         
         <div class="modal-body" style="padding: 1.25rem 0; text-align: left;">
+          <!-- Icon Picker Panel -->
+          <div v-if="showIconPicker" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
+              <span>Escolha um Ícone para esta Categoria</span>
+              <button @click="showIconPicker = false" type="button" style="background:none; border:none; color:var(--text-muted); cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; max-height: 120px; overflow-y: auto; padding-right: 0.25rem;" class="custom-scroll">
+              <button 
+                v-for="ico in availableIconsList" 
+                :key="ico"
+                @click="selectCategoryIcon(ico)"
+                type="button"
+                style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 6px; height: 32px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; transition: all 0.2s;"
+                :style="getCategoryIcon(selectedCategoryName) === ico ? { borderColor: getCategoryColor(selectedCategoryName), background: getCategoryColor(selectedCategoryName) + '22', color: getCategoryColor(selectedCategoryName) } : {}"
+              >
+                <i class="fa-solid" :class="ico"></i>
+              </button>
+            </div>
+          </div>
+
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem;">
             <span style="font-size: 0.85rem; color: var(--text-secondary);">Total Consumido:</span>
             <strong :style="{ color: getCategoryColor(selectedCategoryName), fontSize: '1.15rem', fontWeight: '800' }">
