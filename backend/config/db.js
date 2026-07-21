@@ -213,6 +213,38 @@ const migrateCategories = async () => {
     if (syncCount > 0) {
       console.log(`[Migration] Synchronized category for ${syncCount} matching installments.`);
     }
+
+    // Auto-heal category of any 'Outros' or uncategorized transaction by looking up historically matching descriptions (for the same user)
+    const uncategorizedList = await Transaction.find({
+      $or: [
+        { category: { $exists: false } },
+        { category: 'Outros' },
+        { category: '' },
+        { category: null }
+      ]
+    });
+
+    let autoHealCount = 0;
+    for (const t of uncategorizedList) {
+      if (!t.description) continue;
+      const baseDesc = t.description.split(' (')[0].trim();
+      const escapedDesc = baseDesc.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      
+      const match = await Transaction.findOne({
+        userId: t.userId,
+        description: { $regex: new RegExp('^' + escapedDesc + '(\\s|$|\\s\\()', 'i') },
+        category: { $nin: ['Outros', '', null], $exists: true }
+      });
+      
+      if (match && match.category) {
+        t.category = match.category;
+        await t.save();
+        autoHealCount++;
+      }
+    }
+    if (autoHealCount > 0) {
+      console.log(`[Migration] Auto-healed category for ${autoHealCount} uncategorized transactions based on historical descriptions.`);
+    }
   } catch (err) {
     console.error('[Migration] Error migrating categories:', err);
   }

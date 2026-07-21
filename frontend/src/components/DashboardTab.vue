@@ -706,7 +706,8 @@ const executeImport = async () => {
         type: trans.type,
         cardName: (trans.type === 'card' || trans.type === 'fixed') ? trans.cardName || '' : '',
         month: getMonthYearString(selectedMonth.value),
-        info: trans.info || ''
+        info: trans.info || '',
+        category: trans.category || 'Outros'
       };
 
       const postRes = await fetch(`${props.apiUrl}/api/finances`, {
