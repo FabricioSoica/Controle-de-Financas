@@ -1,7 +1,6 @@
 const express = require('express');
 const FuelRefill = require('../models/FuelRefill');
 const Transaction = require('../models/Transaction');
-const CreditCard = require('../models/CreditCard');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,32 +14,6 @@ const getMonthString = (dateInput) => {
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const year = d.getUTCFullYear();
   return `${month}/${year}`;
-};
-
-// Helper to calculate the billing competence month of a credit card based on its closingDay setting
-const calculateCompetenceMonth = async (userId, cardName, dateInput) => {
-  const d = new Date(dateInput);
-  const day = d.getUTCDate();
-  const month = d.getUTCMonth() + 1; // 1-12
-  const year = d.getUTCFullYear();
-  
-  const config = await CreditCard.findOne({ userId, cardName: cardName.trim() });
-  if (config) {
-    const closingDay = config.closingDay;
-    if (day > closingDay) {
-      // It falls in the next month's statement competence
-      let nextMonth = month + 1;
-      let nextYear = year;
-      if (nextMonth === 13) {
-        nextMonth = 1;
-        nextYear = year + 1;
-      }
-      return `${String(nextMonth).padStart(2, '0')}/${nextYear}`;
-    }
-  }
-  
-  // Default to purchase month
-  return `${String(month).padStart(2, '0')}/${year}`;
 };
 
 // GET /api/fuel - Get all refills with calculated km/l
@@ -148,15 +121,13 @@ router.post('/', async (req, res) => {
     
     // Link to credit card transaction if selected
     if (resolvedPaymentType === 'card' && cardName) {
-      const competenceMonth = await calculateCompetenceMonth(req.user.id, cardName, date);
-      
       const newTrans = new Transaction({
         userId: req.user.id,
         description: `Gasolina - ${info ? info.trim() : 'Abastecimento'}`,
         amount: parseFloat(totalAmount),
         type: 'card',
         cardName: cardName.trim(),
-        month: competenceMonth,
+        month,
         info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`,
         category: 'Combustível'
       });
@@ -214,14 +185,12 @@ router.put('/:id', async (req, res) => {
     let transactionId = refill.transactionId;
     
     if (newPaymentType === 'card' && newCardName) {
-      const competenceMonth = await calculateCompetenceMonth(req.user.id, newCardName, newDate);
-      
       const transPayload = {
         description: `Gasolina - ${newInfo ? newInfo.trim() : 'Abastecimento'}`,
         amount: newTotalAmount,
         type: 'card',
         cardName: newCardName.trim(),
-        month: competenceMonth,
+        month: getMonthString(newDate),
         info: `Abastecimento de ${newLiters.toFixed(1)}L (Odômetro: ${newOdometer.toLocaleString('pt-BR')} km)`,
         category: 'Combustível'
       };
