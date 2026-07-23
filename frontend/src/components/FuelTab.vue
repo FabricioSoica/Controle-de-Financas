@@ -222,6 +222,19 @@ const saveRefill = async () => {
   }
 };
 
+const formCardRef = ref(null);
+
+const scrollToForm = () => {
+  if (formCardRef.value) {
+    formCardRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+const prepareNewRefill = () => {
+  resetForm();
+  scrollToForm();
+};
+
 const editRefill = (r) => {
   refillId.value = r._id;
   const d = new Date(r.date);
@@ -238,6 +251,7 @@ const editRefill = (r) => {
   refillCardName.value = r.cardName || '';
   refillInfo.value = r.info || '';
   isEditing.value = true;
+  scrollToForm();
 };
 
 const deleteRefill = async (id) => {
@@ -298,6 +312,14 @@ const formatDate = (dateStr) => {
         >
           Mês Atual
         </button>
+        <button 
+          class="btn-today mobile-only" 
+          @click="prepareNewRefill"
+          type="button"
+          style="background: linear-gradient(135deg, var(--color-primary), #a855f7); color: white; border: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem;"
+        >
+          <i class="fa-solid fa-plus"></i> Abastecer
+        </button>
       </div>
       <div class="period-display">
         <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">
@@ -346,7 +368,7 @@ const formatDate = (dateStr) => {
     <!-- Main Content Area (Split Layout) -->
     <div class="dashboard-grid">
       <!-- Form Sidebar -->
-      <aside class="form-card">
+      <aside ref="formCardRef" class="form-card">
         <h3 class="section-title">
           <i class="fa-solid" :class="isEditing ? 'fa-pen-to-square' : 'fa-circle-plus'"></i>
           {{ isEditing ? 'Editar Abastecimento' : 'Novo Abastecimento' }}
@@ -473,7 +495,17 @@ const formatDate = (dateStr) => {
             <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
               <i class="fa-solid fa-list-check"></i> Histórico de Abastecimentos
             </h3>
-            <span class="month-picker-label">Gastos do Mês: {{ formatCurrency(totalSpentCurrentMonth) }}</span>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <button 
+                class="btn-today mobile-only" 
+                @click="prepareNewRefill"
+                type="button"
+                style="background: rgba(99, 102, 241, 0.15); color: var(--color-primary); border: 1px solid rgba(99, 102, 241, 0.3); font-weight: 600; font-size: 0.75rem; padding: 0.35rem 0.65rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+              >
+                <i class="fa-solid fa-plus"></i> Abastecer
+              </button>
+              <span class="month-picker-label">Gastos do Mês: {{ formatCurrency(totalSpentCurrentMonth) }}</span>
+            </div>
           </div>
 
           <div v-if="fetchLoading" class="loading-state">

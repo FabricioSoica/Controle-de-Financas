@@ -379,6 +379,14 @@ const saveTransaction = async () => {
   }
 };
 
+const formCardRef = ref(null);
+
+const scrollToForm = () => {
+  if (formCardRef.value) {
+    formCardRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 const editTransaction = (t) => {
   isPopulatingEdit = true;
   transId.value = t._id;
@@ -439,7 +447,7 @@ const executeRenameCategory = async () => {
   
   try {
     const res = await fetch(`${props.apiUrl}/api/finances/categories/rename`, {
-      method: 'PUT',
+      method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ oldName, newName })
     });
@@ -449,7 +457,7 @@ const executeRenameCategory = async () => {
       throw new Error(err.error || 'Erro ao renomear categoria');
     }
     
-    emit('toast', { message: `Categoria renomeada para "${newName}" com sucesso!`, type: 'success' });
+    emit('toast', { message: `Categoria "${oldName}" renomeada para "${newName}" com sucesso!`, type: 'success' });
     
     selectedCategoryName.value = newName;
     isEditingCategoryName.value = false;
@@ -495,6 +503,9 @@ const handleEditFromModal = (t) => {
 
 const handleDeleteFromModal = (t) => {
   deleteTransaction(t);
+=======
+  scrollToForm();
+>>>>>>> d21c9be (feat: add mobile quick action button and smooth scroll to form in FuelTab and DashboardTab)
 };
 
 const showDeleteModal = ref(false);
