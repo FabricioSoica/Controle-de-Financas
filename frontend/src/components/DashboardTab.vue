@@ -378,15 +378,6 @@ const saveTransaction = async () => {
     emit('toast', { message: error.message, type: 'error' });
   }
 };
-
-const formCardRef = ref(null);
-
-const scrollToForm = () => {
-  if (formCardRef.value) {
-    formCardRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-};
-
 const editTransaction = (t) => {
   isPopulatingEdit = true;
   transId.value = t._id;
@@ -503,9 +494,6 @@ const handleEditFromModal = (t) => {
 
 const handleDeleteFromModal = (t) => {
   deleteTransaction(t);
-=======
-  scrollToForm();
->>>>>>> d21c9be (feat: add mobile quick action button and smooth scroll to form in FuelTab and DashboardTab)
 };
 
 const showDeleteModal = ref(false);
