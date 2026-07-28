@@ -44,7 +44,8 @@ router.get('/summary/evolution', async (req, res) => {
           income: 0,
           card: 0,
           fixed: 0,
-          variable: 0
+          variable: 0,
+          cash: 0
         };
       }
 
@@ -52,6 +53,7 @@ router.get('/summary/evolution', async (req, res) => {
       else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
       else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
       else if (t.type === 'variable') monthlyData[sortKey].variable += t.amount;
+      else if (t.type === 'cash') monthlyData[sortKey].cash += t.amount;
     });
 
     const result = Object.values(monthlyData)

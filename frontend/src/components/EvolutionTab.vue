@@ -34,7 +34,7 @@ const formatCurrency = (value) => {
 const maxMonthValue = computed(() => {
   let max = 100;
   evolutionData.value.forEach(d => {
-    const totalExp = d.card + d.variable + d.fixed;
+    const totalExp = d.card + d.variable + d.fixed + (d.cash || 0);
     const val = Math.max(d.income, totalExp);
     if (val > max) max = val;
   });
@@ -113,13 +113,13 @@ onMounted(() => {
               <!-- Expense Bar -->
               <div 
                 class="bar-item expense" 
-                :style="{ height: maxMonthValue ? (((m.card + m.fixed + m.variable) / maxMonthValue) * 100) + '%' : '0%' }"
+                :style="{ height: maxMonthValue ? (((m.card + m.fixed + m.variable + (m.cash || 0)) / maxMonthValue) * 100) + '%' : '0%' }"
               >
                 <span class="bar-tooltip">
-                  <strong>Gastos:</strong> {{ formatCurrency(m.card + m.fixed + m.variable) }}
+                  <strong>Gastos:</strong> {{ formatCurrency(m.card + m.fixed + m.variable + (m.cash || 0)) }}
                   <br/>
                   <span style="font-size: 0.65rem; color: var(--text-muted);">
-                    Cartão: {{ formatCurrency(m.card) }} | Fixo: {{ formatCurrency(m.fixed) }} | Outros: {{ formatCurrency(m.variable) }}
+                    Cartão: {{ formatCurrency(m.card) }} | Fixo: {{ formatCurrency(m.fixed) }} | Outros: {{ formatCurrency(m.variable) }} | Dinheiro: {{ formatCurrency(m.cash || 0) }}
                   </span>
                 </span>
               </div>
@@ -150,6 +150,7 @@ onMounted(() => {
               <th>Cartão (-)</th>
               <th>Fixo (-)</th>
               <th>Outros (-)</th>
+              <th>Dinheiro (-)</th>
               <th>Total Gastos</th>
               <th>Resultado Líquido</th>
             </tr>
@@ -161,15 +162,16 @@ onMounted(() => {
               <td class="text-danger">{{ formatCurrency(m.card) }}</td>
               <td class="text-warning">{{ formatCurrency(m.fixed) }}</td>
               <td class="text-info">{{ formatCurrency(m.variable) }}</td>
-              <td style="font-weight: 600;">{{ formatCurrency(m.card + m.fixed + m.variable) }}</td>
+              <td class="text-cash">{{ formatCurrency(m.cash || 0) }}</td>
+              <td style="font-weight: 600;">{{ formatCurrency(m.card + m.fixed + m.variable + (m.cash || 0)) }}</td>
               <td>
-                <span :class="(m.income - (m.card + m.fixed + m.variable)) >= 0 ? 'badge-surplus' : 'badge-deficit'">
-                  {{ formatCurrency(m.income - (m.card + m.fixed + m.variable)) }}
+                <span :class="(m.income - (m.card + m.fixed + m.variable + (m.cash || 0))) >= 0 ? 'badge-surplus' : 'badge-deficit'">
+                  {{ formatCurrency(m.income - (m.card + m.fixed + m.variable + (m.cash || 0))) }}
                 </span>
               </td>
             </tr>
             <tr v-if="evolutionData.length === 0">
-              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                 Ainda não há lançamentos cadastrados em nenhum mês.
               </td>
             </tr>

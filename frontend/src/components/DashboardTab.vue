@@ -56,6 +56,7 @@ const visibleCards = ref({
   card: true,
   fixed: true,
   variable: true,
+  cash: true,
   net: true,
   cumulative: true
 });
@@ -204,6 +205,7 @@ const exportToCSV = () => {
     else if (t.type === 'card') typePT = 'Cartão';
     else if (t.type === 'fixed') typePT = 'Fixo';
     else if (t.type === 'variable') typePT = 'Variável';
+    else if (t.type === 'cash') typePT = 'Dinheiro';
 
     return [
       t.description,
@@ -596,7 +598,8 @@ const groupedPrevTransactions = computed(() => {
     income: { name: 'Receitas', icon: 'fa-circle-arrow-up', class: 'text-success', items: [] },
     card: { name: 'Cartões', icon: 'fa-credit-card', class: 'text-danger', items: [] },
     fixed: { name: 'Fixos', icon: 'fa-house-lock', class: 'text-warning', items: [] },
-    variable: { name: 'Outros', icon: 'fa-basket-shopping', class: 'text-info', items: [] }
+    variable: { name: 'Outros', icon: 'fa-basket-shopping', class: 'text-info', items: [] },
+    cash: { name: 'Dinheiro', icon: 'fa-money-bill-wave', class: 'text-cash', items: [] }
   };
 
   prevMonthTransactions.value.forEach(t => {
@@ -746,13 +749,15 @@ const transIncomes = computed(() => transactions.value.filter(t => t.type === 'i
 const transCards = computed(() => transactions.value.filter(t => t.type === 'card'));
 const transFixeds = computed(() => transactions.value.filter(t => t.type === 'fixed'));
 const transVariables = computed(() => transactions.value.filter(t => t.type === 'variable'));
+const transCashs = computed(() => transactions.value.filter(t => t.type === 'cash'));
 
 const totalIncomes = computed(() => transIncomes.value.reduce((sum, t) => sum + t.amount, 0));
 const totalCards = computed(() => transCards.value.reduce((sum, t) => sum + t.amount, 0));
 const totalFixeds = computed(() => transFixeds.value.reduce((sum, t) => sum + t.amount, 0));
 const totalVariables = computed(() => transVariables.value.reduce((sum, t) => sum + t.amount, 0));
+const totalCashs = computed(() => transCashs.value.reduce((sum, t) => sum + t.amount, 0));
 
-const totalExpenses = computed(() => totalCards.value + totalVariables.value);
+const totalExpenses = computed(() => totalCards.value + totalVariables.value + totalCashs.value);
 const netIncome = computed(() => totalIncomes.value - totalExpenses.value);
 const netPostFixed = computed(() => netIncome.value - totalFixeds.value);
 
@@ -1075,6 +1080,9 @@ const donutSegments = computed(() => {
               <input type="checkbox" v-model="visibleCards.variable" /> Outros Gastos
             </label>
             <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.cash" /> Gastos em Dinheiro
+            </label>
+            <label class="config-checkbox-label">
               <input type="checkbox" v-model="visibleCards.net" /> Resultado Líquido
             </label>
             <label class="config-checkbox-label">
@@ -1120,6 +1128,13 @@ const donutSegments = computed(() => {
         <div class="card-title">Outros Gastos</div>
         <div class="card-value text-info">{{ formatCurrency(totalVariables) }}</div>
         <div class="card-sub-calc">Empréstimos, Pgto Pessoas, etc</div>
+      </div>
+
+      <div v-if="visibleCards.cash" class="summary-card card-cash">
+        <span class="card-icon"><i class="fa-solid fa-money-bill-wave"></i></span>
+        <div class="card-title">Gastos em Dinheiro</div>
+        <div class="card-value text-cash">{{ formatCurrency(totalCashs) }}</div>
+        <div class="card-sub-calc">Pagamentos em espécie</div>
       </div>
 
       <div v-if="visibleCards.net" class="summary-card card-net">
@@ -1336,6 +1351,7 @@ const donutSegments = computed(() => {
               <label class="form-label">Tipo</label>
               <select v-model="transType" class="form-select">
                 <option value="card">Cartão de Crédito (-)</option>
+                <option value="cash">Gasto em Dinheiro (-)</option>
                 <option value="income">Receita (+)</option>
                 <option value="fixed">Gasto Fixo (-)</option>
                 <option value="variable">Outros Gastos (-)</option>
@@ -1465,7 +1481,7 @@ const donutSegments = computed(() => {
             <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
               <i class="fa-solid fa-list-check"></i> Distribuição dos Lançamentos
             </h3>
-            <span class="month-picker-label">Gastos do Mês: {{ formatCurrency(totalCards + totalFixeds + totalVariables) }}</span>
+            <span class="month-picker-label">Gastos do Mês: {{ formatCurrency(totalCards + totalFixeds + totalVariables + totalCashs) }}</span>
           </div>
           
           <div class="category-columns-grid">
@@ -1572,6 +1588,30 @@ const donutSegments = computed(() => {
                   </div>
                 </div>
                 <div v-if="transVariables.length === 0" class="empty-state">Sem outros</div>
+              </div>
+            </div>
+
+            <!-- 5. Dinheiro -->
+            <div class="category-column">
+              <div class="column-header cash">
+                <span>Dinheiro</span>
+                <span class="column-sum">{{ formatCurrency(totalCashs) }}</span>
+              </div>
+              <div class="transaction-list-items">
+                <div v-for="t in transCashs" :key="t._id" class="transaction-item">
+                  <div class="item-main-row">
+                    <span class="item-desc">{{ t.description }}</span>
+                    <span class="item-val text-cash">{{ formatCurrency(t.amount) }}</span>
+                  </div>
+                  <div class="item-details-row">
+                    <span class="item-obs">{{ t.info }}</span>
+                    <div class="item-actions">
+                      <button class="action-btn btn-edit" @click="editTransaction(t)"><i class="fa-solid fa-pen"></i></button>
+                      <button class="action-btn btn-delete" @click="deleteTransaction(t)"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="transCashs.length === 0" class="empty-state">Sem dinheiro</div>
               </div>
             </div>
           </div>

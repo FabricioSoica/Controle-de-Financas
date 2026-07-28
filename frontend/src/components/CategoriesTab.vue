@@ -195,6 +195,7 @@ onMounted(() => {
               <span v-if="t.type === 'card'" style="color: var(--color-danger); font-weight: 600;"><i class="fa-solid fa-credit-card"></i> {{ t.cardName }}</span>
               <span v-else-if="t.type === 'fixed'" style="color: var(--color-warning); font-weight: 600;"><i class="fa-solid fa-thumbtack"></i> Gasto Fixo</span>
               <span v-else-if="t.type === 'income'" style="color: var(--color-success); font-weight: 600;"><i class="fa-solid fa-circle-down"></i> Receita</span>
+              <span v-else-if="t.type === 'cash'" style="color: var(--color-cash); font-weight: 600;"><i class="fa-solid fa-money-bill-wave"></i> Dinheiro</span>
               <span v-else style="color: var(--color-info); font-weight: 600;"><i class="fa-solid fa-tag"></i> Outro</span>
               
               <span>•</span>

@@ -28,6 +28,8 @@
   --color-warning-rgb: 245, 158, 11;
   --color-info: #3b82f6;          /* Blue (Variable/Other) */
   --color-info-rgb: 59, 130, 246;
+  --color-cash: #14b8a6;          /* Teal (Cash Expenses) */
+  --color-cash-rgb: 20, 184, 166;
 
   /* Shadows and Effects */
   --glow-success: 0 0 20px rgba(16, 185, 129, 0.25);
@@ -271,6 +273,7 @@ a:hover {
 .card-card::before { background-color: var(--color-danger); }
 .card-fixed::before { background-color: var(--color-warning); }
 .card-variable::before { background-color: var(--color-info); }
+.card-cash::before { background-color: var(--color-cash); }
 .card-net::before { background: linear-gradient(to bottom, var(--color-primary), #a855f7); }
 
 .card-icon {
@@ -307,6 +310,7 @@ a:hover {
 .text-danger { color: var(--color-danger); text-shadow: rgba(244, 63, 94, 0.1) 0 0 10px; }
 .text-warning { color: var(--color-warning); text-shadow: rgba(245, 158, 11, 0.1) 0 0 10px; }
 .text-info { color: var(--color-info); text-shadow: rgba(59, 130, 246, 0.1) 0 0 10px; }
+.text-cash { color: var(--color-cash); text-shadow: rgba(20, 184, 166, 0.1) 0 0 10px; }
 .text-primary { color: var(--color-primary); }
 
 .card-net {
@@ -522,6 +526,7 @@ a:hover {
 .column-header.card { border-bottom-color: var(--color-danger); color: var(--color-danger); }
 .column-header.fixed { border-bottom-color: var(--color-warning); color: var(--color-warning); }
 .column-header.variable { border-bottom-color: var(--color-info); color: var(--color-info); }
+.column-header.cash { border-bottom-color: var(--color-cash); color: var(--color-cash); }
 
 .column-sum {
   font-family: var(--font-heading);

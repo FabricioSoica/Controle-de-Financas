@@ -19,7 +19,7 @@ const TransactionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['income', 'fixed', 'card', 'variable'] // income = receita, fixed = gasto fixo, card = cartão, variable = outros gastos
+    enum: ['income', 'fixed', 'card', 'variable', 'cash'] // income = receita, fixed = gasto fixo, card = cartão, variable = outros gastos, cash = gasto em dinheiro
   },
   cardName: {
     type: String,
