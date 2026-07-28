@@ -41,11 +41,9 @@ jobs:
             # Navega até a pasta do projeto
             cd /var/www/html/controle-financas
 
-            # Descarta qualquer alteração local temporária (evitando conflitos no git pull)
-            git reset --hard
-
-            # Atualiza o código com a versão mais recente do GitHub (agora autenticado)
-            git pull origin main
+            # Atualiza e força a sincronização exata com o repositório no GitHub
+            git fetch origin main
+            git reset --hard origin/main
 
             # Atualiza e reinicia o Backend
             cd backend
