@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import CategoriesTab from './CategoriesTab.vue';
 
 const props = defineProps({
@@ -109,6 +109,11 @@ onMounted(() => {
   fetchRegisteredCards();
   fetchDbCategories();
   fetchCategoryConfigs();
+  document.addEventListener('click', handleCategoryClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleCategoryClickOutside);
 });
 
 // Watch month changes to reload transactions
@@ -933,6 +938,62 @@ const availableCategories = computed(() => {
   return [...new Set([...defaults, ...used])];
 });
 
+// Custom Category Dropdown State & Methods
+const isCategoryDropdownOpen = ref(false);
+const categorySearchQuery = ref('');
+const categorySearchInputRef = ref(null);
+
+const toggleCategoryDropdown = () => {
+  isCategoryDropdownOpen.value = !isCategoryDropdownOpen.value;
+  if (isCategoryDropdownOpen.value) {
+    categorySearchQuery.value = '';
+    setTimeout(() => {
+      if (categorySearchInputRef.value) {
+        categorySearchInputRef.value.focus();
+      }
+    }, 50);
+  }
+};
+
+const closeCategoryDropdown = () => {
+  isCategoryDropdownOpen.value = false;
+};
+
+const selectCategory = (catName) => {
+  if (catName && catName.trim()) {
+    transCategory.value = catName.trim();
+  }
+  isCategoryDropdownOpen.value = false;
+  categorySearchQuery.value = '';
+};
+
+const selectCategoryFromSearch = () => {
+  const query = categorySearchQuery.value.trim();
+  if (query) {
+    selectCategory(query);
+  }
+};
+
+const filteredCategories = computed(() => {
+  const q = categorySearchQuery.value.trim().toLowerCase();
+  const allAvailable = availableCategories.value;
+  if (!q) return allAvailable;
+  return allAvailable.filter(c => c.toLowerCase().includes(q));
+});
+
+const isSearchExactMatch = computed(() => {
+  const q = categorySearchQuery.value.trim().toLowerCase();
+  if (!q) return false;
+  return availableCategories.value.some(c => c.toLowerCase() === q);
+});
+
+const handleCategoryClickOutside = (event) => {
+  const el = document.getElementById('custom-category-select-wrapper');
+  if (el && !el.contains(event.target)) {
+    isCategoryDropdownOpen.value = false;
+  }
+};
+
 const categoryBreakdown = computed(() => {
   const expenseTransactions = transactions.value.filter(t => t.type !== 'income');
   const totals = {};
@@ -1434,19 +1495,124 @@ const donutSegments = computed(() => {
             </div>
           </div>
 
-          <div class="form-group">
+          <!-- Custom Category Selector -->
+          <div class="form-group" style="position: relative;" id="custom-category-select-wrapper">
             <label class="form-label">Categoria</label>
-            <input 
-              type="text" 
-              v-model="transCategory" 
-              list="categories-list" 
-              class="form-input" 
-              placeholder="Selecione ou digite uma categoria"
-              required
-            />
-            <datalist id="categories-list">
-              <option v-for="cat in availableCategories" :value="cat" :key="cat" />
-            </datalist>
+
+            <!-- Custom Category Trigger Box -->
+            <div 
+              class="custom-select-trigger" 
+              :class="{ open: isCategoryDropdownOpen }"
+              @click.stop="toggleCategoryDropdown"
+              tabindex="0"
+              @keydown.space.prevent="toggleCategoryDropdown"
+              @keydown.enter.prevent="toggleCategoryDropdown"
+              @keydown.esc="closeCategoryDropdown"
+            >
+              <div class="selected-category-display">
+                <span 
+                  class="cat-icon-badge" 
+                  :style="{ 
+                    background: getCategoryColor(transCategory) + '22', 
+                    color: getCategoryColor(transCategory),
+                    borderColor: getCategoryColor(transCategory) + '55'
+                  }"
+                >
+                  <i class="fa-solid" :class="getCategoryIcon(transCategory)"></i>
+                </span>
+                <span class="selected-cat-name">{{ transCategory || 'Selecione uma categoria' }}</span>
+              </div>
+              <i class="fa-solid fa-chevron-down trigger-arrow" :class="{ open: isCategoryDropdownOpen }"></i>
+            </div>
+
+            <!-- Custom Category Dropdown Menu Overlay -->
+            <div v-if="isCategoryDropdownOpen" class="custom-select-dropdown custom-scroll">
+              <!-- Search Bar inside Dropdown -->
+              <div class="dropdown-search-wrapper" @click.stop>
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input 
+                  type="text" 
+                  v-model="categorySearchQuery" 
+                  placeholder="Buscar ou criar categoria..." 
+                  class="dropdown-search-input"
+                  ref="categorySearchInputRef"
+                  @click.stop
+                  @keydown.esc="closeCategoryDropdown"
+                  @keydown.enter.prevent="selectCategoryFromSearch"
+                />
+                <button 
+                  v-if="categorySearchQuery" 
+                  type="button" 
+                  class="btn-clear-search" 
+                  @click.stop="categorySearchQuery = ''"
+                >
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <!-- Quick Category Pills -->
+              <div class="quick-pills-row" @click.stop>
+                <span class="quick-pills-label">Populares:</span>
+                <button 
+                  v-for="cat in (transType === 'income' ? ['Salário', 'Outras Receitas'] : ['Alimentação', 'Transporte', 'Combustível', 'Moradia', 'Compras / Vestuário', 'Lazer / Viagens', 'Saúde', 'Assinaturas & Serviços'])"
+                  :key="cat"
+                  type="button"
+                  class="quick-pill-btn"
+                  :class="{ active: transCategory === cat }"
+                  @click.stop="selectCategory(cat)"
+                >
+                  <i class="fa-solid" :class="getCategoryIcon(cat)" :style="{ color: getCategoryColor(cat) }"></i>
+                  <span>{{ cat }}</span>
+                </button>
+              </div>
+
+              <!-- Options List -->
+              <div class="dropdown-options-list">
+                <!-- Option to create new custom category if not exact match -->
+                <div 
+                  v-if="categorySearchQuery.trim() && !isSearchExactMatch"
+                  class="dropdown-option new-custom-option"
+                  @click.stop="selectCategory(categorySearchQuery.trim())"
+                >
+                  <div class="option-left">
+                    <span class="cat-icon-badge new-cat-badge">
+                      <i class="fa-solid fa-plus"></i>
+                    </span>
+                    <span class="option-text">
+                      Criar nova categoria: <strong>"{{ categorySearchQuery.trim() }}"</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Existing Categories -->
+                <div 
+                  v-for="cat in filteredCategories" 
+                  :key="cat"
+                  class="dropdown-option"
+                  :class="{ selected: transCategory === cat }"
+                  @click.stop="selectCategory(cat)"
+                >
+                  <div class="option-left">
+                    <span 
+                      class="cat-icon-badge" 
+                      :style="{ 
+                        background: getCategoryColor(cat) + '22', 
+                        color: getCategoryColor(cat),
+                        borderColor: getCategoryColor(cat) + '44'
+                      }"
+                    >
+                      <i class="fa-solid" :class="getCategoryIcon(cat)"></i>
+                    </span>
+                    <span class="option-name">{{ cat }}</span>
+                  </div>
+                  <i v-if="transCategory === cat" class="fa-solid fa-circle-check option-check"></i>
+                </div>
+
+                <div v-if="filteredCategories.length === 0 && !categorySearchQuery.trim()" class="dropdown-empty">
+                  Nenhuma categoria cadastrada.
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
