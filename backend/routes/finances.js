@@ -24,27 +24,61 @@ const addMonths = (monthYearStr, monthsToAdd) => {
   return `${String(month).padStart(2, '0')}/${year}`;
 };
 
-// Get annual evolution summary (by year, defaulting to current year)
+// Get annual / custom period evolution summary
 router.get('/summary/evolution', async (req, res) => {
   try {
-    const targetYear = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
+    const { year, startMonth, endMonth } = req.query;
     const transactions = await Transaction.find({ userId: req.user.id });
 
-    // Initialize all 12 months for targetYear (01/YYYY to 12/YYYY)
     const monthlyData = {};
-    for (let m = 1; m <= 12; m++) {
-      const monthStr = String(m).padStart(2, '0');
-      const sortKey = `${targetYear}-${monthStr}`;
-      const monthLabel = `${monthStr}/${targetYear}`;
-      monthlyData[sortKey] = {
-        monthLabel,
-        sortKey,
-        income: 0,
-        card: 0,
-        fixed: 0,
-        variable: 0,
-        cash: 0
-      };
+
+    if (startMonth && endMonth) {
+      // Custom month range mode (e.g., startMonth = "2026-01", endMonth = "2026-08")
+      const [sYear, sM] = startMonth.split('-').map(v => parseInt(v, 10));
+      const [eYear, eM] = endMonth.split('-').map(v => parseInt(v, 10));
+
+      let curYear = sYear;
+      let curM = sM;
+
+      let iterations = 0;
+      while ((curYear < eYear || (curYear === eYear && curM <= eM)) && iterations < 60) {
+        iterations++;
+        const monthStr = String(curM).padStart(2, '0');
+        const sortKey = `${curYear}-${monthStr}`;
+        const monthLabel = `${monthStr}/${curYear}`;
+        monthlyData[sortKey] = {
+          monthLabel,
+          sortKey,
+          income: 0,
+          card: 0,
+          fixed: 0,
+          variable: 0,
+          cash: 0
+        };
+
+        curM++;
+        if (curM > 12) {
+          curM = 1;
+          curYear++;
+        }
+      }
+    } else {
+      // Default: Specific Year mode (e.g. year = 2026)
+      const targetYear = year ? parseInt(year, 10) : new Date().getFullYear();
+      for (let m = 1; m <= 12; m++) {
+        const monthStr = String(m).padStart(2, '0');
+        const sortKey = `${targetYear}-${monthStr}`;
+        const monthLabel = `${monthStr}/${targetYear}`;
+        monthlyData[sortKey] = {
+          monthLabel,
+          sortKey,
+          income: 0,
+          card: 0,
+          fixed: 0,
+          variable: 0,
+          cash: 0
+        };
+      }
     }
 
     transactions.forEach(t => {
@@ -52,9 +86,8 @@ router.get('/summary/evolution', async (req, res) => {
       if (!m) return;
 
       const [monthStr, yearStr] = m.split('/');
-      if (parseInt(yearStr, 10) !== targetYear) return;
-
       const sortKey = `${yearStr}-${String(monthStr).padStart(2, '0')}`;
+
       if (monthlyData[sortKey]) {
         if (t.type === 'income') monthlyData[sortKey].income += t.amount;
         else if (t.type === 'card') monthlyData[sortKey].card += t.amount;

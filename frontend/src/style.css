@@ -216,6 +216,33 @@ a:hover {
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
 }
 
+.btn-nav-month, .btn-nav-year {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: var(--transition-smooth);
+}
+
+.btn-nav-month:hover, .btn-nav-year:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--color-primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.btn-nav-month:active, .btn-nav-year:active {
+  transform: translateY(0);
+}
+
 .btn-today {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border-color);
