@@ -137,7 +137,8 @@ const fetchMonthlyGoal = async () => {
 const fetchAnnualEvolution = async () => {
   if (!props.token) return;
   try {
-    const res = await fetch(`${props.apiUrl}/api/finances/summary/evolution`, {
+    const currentYear = new Date().getFullYear();
+    const res = await fetch(`${props.apiUrl}/api/finances/summary/evolution?year=${currentYear}`, {
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Falha ao buscar evolução anual');

@@ -24,42 +24,47 @@ const addMonths = (monthYearStr, monthsToAdd) => {
   return `${String(month).padStart(2, '0')}/${year}`;
 };
 
-// Get annual evolution summary (last 12 months)
+// Get annual evolution summary (by year, defaulting to current year)
 router.get('/summary/evolution', async (req, res) => {
   try {
+    const targetYear = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
     const transactions = await Transaction.find({ userId: req.user.id });
+
+    // Initialize all 12 months for targetYear (01/YYYY to 12/YYYY)
     const monthlyData = {};
+    for (let m = 1; m <= 12; m++) {
+      const monthStr = String(m).padStart(2, '0');
+      const sortKey = `${targetYear}-${monthStr}`;
+      const monthLabel = `${monthStr}/${targetYear}`;
+      monthlyData[sortKey] = {
+        monthLabel,
+        sortKey,
+        income: 0,
+        card: 0,
+        fixed: 0,
+        variable: 0,
+        cash: 0
+      };
+    }
 
     transactions.forEach(t => {
       const m = t.month;
       if (!m) return;
 
       const [monthStr, yearStr] = m.split('/');
-      const sortKey = `${yearStr}-${monthStr}`;
+      if (parseInt(yearStr, 10) !== targetYear) return;
 
-      if (!monthlyData[sortKey]) {
-        monthlyData[sortKey] = {
-          monthLabel: m,
-          sortKey,
-          income: 0,
-          card: 0,
-          fixed: 0,
-          variable: 0,
-          cash: 0
-        };
+      const sortKey = `${yearStr}-${String(monthStr).padStart(2, '0')}`;
+      if (monthlyData[sortKey]) {
+        if (t.type === 'income') monthlyData[sortKey].income += t.amount;
+        else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
+        else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
+        else if (t.type === 'variable') monthlyData[sortKey].variable += t.amount;
+        else if (t.type === 'cash') monthlyData[sortKey].cash += t.amount;
       }
-
-      if (t.type === 'income') monthlyData[sortKey].income += t.amount;
-      else if (t.type === 'card') monthlyData[sortKey].card += t.amount;
-      else if (t.type === 'fixed') monthlyData[sortKey].fixed += t.amount;
-      else if (t.type === 'variable') monthlyData[sortKey].variable += t.amount;
-      else if (t.type === 'cash') monthlyData[sortKey].cash += t.amount;
     });
 
-    const result = Object.values(monthlyData)
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-      .slice(-12); // Keep only last 12 months
-
+    const result = Object.values(monthlyData).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar dados de evolução: ' + error.message });
