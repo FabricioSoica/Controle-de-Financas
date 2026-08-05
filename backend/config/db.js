@@ -3,6 +3,7 @@ const Transaction = require('../models/Transaction');
 const ShoppingItem = require('../models/ShoppingItem');
 const User = require('../models/User');
 const CreditCard = require('../models/CreditCard');
+const FuelRefill = require('../models/FuelRefill');
 
 const migrateOrphans = async () => {
   try {
@@ -57,8 +58,7 @@ const migrateCreditCards = async () => {
       { $group: { _id: { userId: '$userId', cardName: '$cardName' } } }
     ]);
     
-    // Scan all fuel refills for unique cardName values (dynamically import to avoid circular dependency)
-    const FuelRefill = mongoose.model('FuelRefill');
+    // Scan all fuel refills for unique cardName values
     const fuelCardNames = await FuelRefill.aggregate([
       { $match: { paymentType: 'card', cardName: { $ne: '' } } },
       { $group: { _id: { userId: '$userId', cardName: '$cardName' } } }
@@ -250,6 +250,92 @@ const migrateCategories = async () => {
   }
 };
 
+const migrateFuelAndCategories = async () => {
+  try {
+    // 1. Convert all 'Combustível' and 'Gasolina' transaction categories to 'Transporte'
+    const catResult = await Transaction.updateMany(
+      { category: { $in: ['Combustível', 'Gasolina'] } },
+      { $set: { category: 'Transporte' } }
+    );
+    if (catResult.modifiedCount > 0) {
+      console.log(`[Migration] Updated ${catResult.modifiedCount} transactions from Combustível/Gasolina to Transporte.`);
+    }
+
+    // 2. Sync all FuelRefills with Transactions and correct invoice months/types
+    const refills = await FuelRefill.find();
+
+    let syncedCount = 0;
+    for (const r of refills) {
+      const d = new Date(r.date);
+      const day = d.getUTCDate();
+      let year = d.getUTCFullYear();
+      let monthNum = d.getUTCMonth() + 1;
+
+      let expectedType = 'cash';
+      let expectedCardName = '';
+      let expectedMonth = '';
+
+      if (r.paymentType === 'card' && r.cardName && r.cardName.trim()) {
+        expectedType = 'card';
+        expectedCardName = r.cardName.trim();
+        let closingDay = 14;
+
+        const cardConfig = await CreditCard.findOne({ userId: r.userId, cardName: expectedCardName });
+        if (cardConfig && cardConfig.closingDay) {
+          closingDay = cardConfig.closingDay;
+        }
+
+        if (closingDay && day > closingDay) {
+          monthNum += 1;
+          if (monthNum > 12) {
+            monthNum = 1;
+            year += 1;
+          }
+        }
+        expectedMonth = `${String(monthNum).padStart(2, '0')}/${year}`;
+      } else {
+        expectedType = 'cash';
+        expectedMonth = `${String(monthNum).padStart(2, '0')}/${year}`;
+      }
+
+      const transPayload = {
+        userId: r.userId,
+        description: `Gasolina - ${r.info ? r.info.trim() : 'Abastecimento'}`,
+        amount: r.totalAmount,
+        type: expectedType,
+        cardName: expectedCardName,
+        month: expectedMonth,
+        info: `Abastecimento de ${r.liters ? r.liters.toFixed(1) : 0}L (Odômetro: ${r.odometer ? r.odometer.toLocaleString('pt-BR') : 0} km)`,
+        category: 'Transporte'
+      };
+
+      let existingTrans = null;
+      if (r.transactionId) {
+        existingTrans = await Transaction.findOne({ _id: r.transactionId, userId: r.userId });
+      }
+
+      if (existingTrans) {
+        await Transaction.updateOne(
+          { _id: existingTrans._id },
+          { $set: transPayload }
+        );
+      } else {
+        const newTrans = new Transaction(transPayload);
+        const savedTrans = await newTrans.save();
+        r.transactionId = savedTrans._id;
+        await r.save();
+      }
+      syncedCount++;
+    }
+
+    if (syncedCount > 0) {
+      console.log(`[Migration] Processed and synced ${syncedCount} fuel refills with transactions.`);
+    }
+  } catch (err) {
+    console.error('[Migration] Error in migrateFuelAndCategories:', err);
+  }
+};
+
 const connectDB = async () => {
   const MONGO_URI = process.env.MONGO_URI;
   if (!MONGO_URI) {
@@ -266,6 +352,8 @@ const connectDB = async () => {
     await migrateCreditCards();
     // Run DB migrations for categories
     await migrateCategories();
+    // Run DB migrations for fuel & category consolidation
+    await migrateFuelAndCategories();
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1);
@@ -276,5 +364,6 @@ module.exports = {
   connectDB,
   migrateOrphans,
   migrateCreditCards,
-  migrateCategories
+  migrateCategories,
+  migrateFuelAndCategories
 };

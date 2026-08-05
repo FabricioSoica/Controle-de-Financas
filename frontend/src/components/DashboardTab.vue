@@ -886,7 +886,7 @@ const sortedCategories = computed(() => {
   const list = new Set();
   
   const defaultCats = [
-    'Alimentação', 'Transporte', 'Combustível', 'Moradia', 
+    'Alimentação', 'Transporte', 'Moradia', 
     'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 
     'Compras / Vestuário', 'Outros', 'Salário', 'Outras Receitas'
   ];
@@ -922,7 +922,7 @@ const getCategoryColor = (name) => {
 const availableCategories = computed(() => {
   const defaults = transType.value === 'income'
     ? ['Salário', 'Outras Receitas']
-    : ['Alimentação', 'Transporte', 'Combustível', 'Moradia', 'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 'Compras / Vestuário', 'Outros'];
+    : ['Alimentação', 'Transporte', 'Moradia', 'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 'Compras / Vestuário', 'Outros'];
   
   const used = transactions.value
     .filter(t => {
@@ -1554,7 +1554,7 @@ const donutSegments = computed(() => {
               <div class="quick-pills-row" @click.stop>
                 <span class="quick-pills-label">Populares:</span>
                 <button 
-                  v-for="cat in (transType === 'income' ? ['Salário', 'Outras Receitas'] : ['Alimentação', 'Transporte', 'Combustível', 'Moradia', 'Compras / Vestuário', 'Lazer / Viagens', 'Saúde', 'Assinaturas & Serviços'])"
+                  v-for="cat in (transType === 'income' ? ['Salário', 'Outras Receitas'] : ['Alimentação', 'Transporte', 'Moradia', 'Compras / Vestuário', 'Lazer / Viagens', 'Saúde', 'Assinaturas & Serviços'])"
                   :key="cat"
                   type="button"
                   class="quick-pill-btn"
@@ -1567,7 +1567,7 @@ const donutSegments = computed(() => {
               </div>
 
               <!-- Options List -->
-              <div class="dropdown-options-list">
+              <div class="dropdown-options-list custom-scroll">
                 <!-- Option to create new custom category if not exact match -->
                 <div 
                   v-if="categorySearchQuery.trim() && !isSearchExactMatch"

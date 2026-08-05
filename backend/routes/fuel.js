@@ -1,6 +1,7 @@
 const express = require('express');
 const FuelRefill = require('../models/FuelRefill');
 const Transaction = require('../models/Transaction');
+const CreditCard = require('../models/CreditCard');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -14,6 +15,32 @@ const getMonthString = (dateInput) => {
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');
   const year = d.getUTCFullYear();
   return `${month}/${year}`;
+};
+
+// Helper to compute target transaction month (respecting credit card closingDay if type is card)
+const getTransactionMonth = async (userId, dateInput, paymentType, cardName) => {
+  const d = new Date(dateInput);
+  const day = d.getUTCDate();
+  let year = d.getUTCFullYear();
+  let monthNum = d.getUTCMonth() + 1;
+
+  if (paymentType === 'card' && cardName) {
+    let closingDay = 14;
+    const cardConfig = await CreditCard.findOne({ userId, cardName: cardName.trim() });
+    if (cardConfig && cardConfig.closingDay) {
+      closingDay = cardConfig.closingDay;
+    }
+    if (closingDay && day > closingDay) {
+      monthNum += 1;
+      if (monthNum > 12) {
+        monthNum = 1;
+        year += 1;
+      }
+    }
+  }
+
+  const monthStr = String(monthNum).padStart(2, '0');
+  return `${monthStr}/${year}`;
 };
 
 // GET /api/fuel - Get all refills with calculated km/l
@@ -115,26 +142,26 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: data, odômetro, litros, preço por litro e valor total são obrigatórios.' });
     }
     
-    const month = getMonthString(date);
-    let transactionId = null;
+    const refillMonth = getMonthString(date);
     const resolvedPaymentType = paymentType || 'money';
+    const cleanCardName = resolvedPaymentType === 'card' && cardName ? cardName.trim() : '';
+
+    const transType = resolvedPaymentType === 'card' ? 'card' : 'cash';
+    const transMonth = await getTransactionMonth(req.user.id, date, resolvedPaymentType, cleanCardName);
+
+    // Create linked transaction for general financial tracking (both card and cash)
+    const newTrans = new Transaction({
+      userId: req.user.id,
+      description: `Gasolina - ${info ? info.trim() : 'Abastecimento'}`,
+      amount: parseFloat(totalAmount),
+      type: transType,
+      cardName: cleanCardName,
+      month: transMonth,
+      info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`,
+      category: 'Transporte'
+    });
     
-    // Link to credit card transaction if selected
-    if (resolvedPaymentType === 'card' && cardName) {
-      const newTrans = new Transaction({
-        userId: req.user.id,
-        description: `Gasolina - ${info ? info.trim() : 'Abastecimento'}`,
-        amount: parseFloat(totalAmount),
-        type: 'card',
-        cardName: cardName.trim(),
-        month,
-        info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`,
-        category: 'Combustível'
-      });
-      
-      const savedTrans = await newTrans.save();
-      transactionId = savedTrans._id;
-    }
+    const savedTrans = await newTrans.save();
     
     const newRefill = new FuelRefill({
       userId: req.user.id,
@@ -143,10 +170,10 @@ router.post('/', async (req, res) => {
       liters: parseFloat(liters),
       pricePerLiter: parseFloat(pricePerLiter),
       totalAmount: parseFloat(totalAmount),
-      month,
+      month: refillMonth,
       paymentType: resolvedPaymentType,
-      cardName: resolvedPaymentType === 'card' && cardName ? cardName.trim() : '',
-      transactionId,
+      cardName: cleanCardName,
+      transactionId: savedTrans._id,
       info: info || ''
     });
     
@@ -167,60 +194,48 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Registro de abastecimento não encontrado ou sem permissão.' });
     }
     
-    const oldPaymentType = refill.paymentType;
-    const newPaymentType = paymentType !== undefined ? paymentType : oldPaymentType;
-    const oldCardName = refill.cardName;
-    const newCardName = cardName !== undefined ? cardName : oldCardName;
-    const oldDate = refill.date;
-    const newDate = date !== undefined ? new Date(date) : oldDate;
-    const oldTotalAmount = refill.totalAmount;
-    const newTotalAmount = totalAmount !== undefined ? parseFloat(totalAmount) : oldTotalAmount;
-    const oldInfo = refill.info;
-    const newInfo = info !== undefined ? info : oldInfo;
-    const oldLiters = refill.liters;
-    const newLiters = liters !== undefined ? parseFloat(liters) : oldLiters;
-    const oldOdometer = refill.odometer;
-    const newOdometer = odometer !== undefined ? parseFloat(odometer) : oldOdometer;
+    const newPaymentType = paymentType !== undefined ? paymentType : refill.paymentType;
+    const newCardName = cardName !== undefined ? cardName : refill.cardName;
+    const cleanCardName = newPaymentType === 'card' && newCardName ? newCardName.trim() : '';
+    const newDate = date !== undefined ? new Date(date) : refill.date;
+    const newTotalAmount = totalAmount !== undefined ? parseFloat(totalAmount) : refill.totalAmount;
+    const newInfo = info !== undefined ? info : refill.info;
+    const newLiters = liters !== undefined ? parseFloat(liters) : refill.liters;
+    const newOdometer = odometer !== undefined ? parseFloat(odometer) : refill.odometer;
+    
+    const transType = newPaymentType === 'card' ? 'card' : 'cash';
+    const transMonth = await getTransactionMonth(req.user.id, newDate, newPaymentType, cleanCardName);
     
     let transactionId = refill.transactionId;
     
-    if (newPaymentType === 'card' && newCardName) {
-      const transPayload = {
-        description: `Gasolina - ${newInfo ? newInfo.trim() : 'Abastecimento'}`,
-        amount: newTotalAmount,
-        type: 'card',
-        cardName: newCardName.trim(),
-        month: getMonthString(newDate),
-        info: `Abastecimento de ${newLiters.toFixed(1)}L (Odômetro: ${newOdometer.toLocaleString('pt-BR')} km)`,
-        category: 'Combustível'
-      };
-      
-      if (oldPaymentType === 'card' && transactionId) {
-        // Update existing transaction
-        await Transaction.findOneAndUpdate(
-          { _id: transactionId, userId: req.user.id },
-          { $set: transPayload }
-        );
+    const transPayload = {
+      description: `Gasolina - ${newInfo ? newInfo.trim() : 'Abastecimento'}`,
+      amount: newTotalAmount,
+      type: transType,
+      cardName: cleanCardName,
+      month: transMonth,
+      info: `Abastecimento de ${newLiters.toFixed(1)}L (Odômetro: ${newOdometer.toLocaleString('pt-BR')} km)`,
+      category: 'Transporte'
+    };
+    
+    if (transactionId) {
+      const existingTrans = await Transaction.findOne({ _id: transactionId, userId: req.user.id });
+      if (existingTrans) {
+        await Transaction.updateOne({ _id: transactionId, userId: req.user.id }, { $set: transPayload });
       } else {
-        // Create new transaction
-        const newTrans = new Transaction({
-          userId: req.user.id,
-          ...transPayload
-        });
+        const newTrans = new Transaction({ userId: req.user.id, ...transPayload });
         const savedTrans = await newTrans.save();
         transactionId = savedTrans._id;
       }
     } else {
-      // Paid in cash or card name removed, so remove transaction if it exists
-      if (oldPaymentType === 'card' && transactionId) {
-        await Transaction.findOneAndDelete({ _id: transactionId, userId: req.user.id });
-        transactionId = null;
-      }
+      const newTrans = new Transaction({ userId: req.user.id, ...transPayload });
+      const savedTrans = await newTrans.save();
+      transactionId = savedTrans._id;
     }
     
     const updatedFields = {
       paymentType: newPaymentType,
-      cardName: newPaymentType === 'card' && newCardName ? newCardName.trim() : '',
+      cardName: cleanCardName,
       transactionId
     };
     

@@ -75,7 +75,7 @@ const fetchDbCategories = async () => {
 
 // Available categories for suggestions
 const defaultCategories = [
-  'Alimentação', 'Transporte', 'Combustível', 'Moradia', 
+  'Alimentação', 'Transporte', 'Moradia', 
   'Lazer / Viagens', 'Saúde', 'Educação', 'Assinaturas & Serviços', 
   'Compras / Vestuário', 'Salário', 'Outras Receitas', 'Outros'
 ];
@@ -240,7 +240,7 @@ onMounted(() => {
             <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
               <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center; margin-right: 0.25rem;">Sugestões rápidas:</span>
               <button 
-                v-for="quickCat in (t.type === 'income' ? ['Salário', 'Outras Receitas'] : ['Alimentação', 'Transporte', 'Combustível', 'Moradia', 'Lazer / Viagens', 'Saúde', 'Assinaturas & Serviços', 'Compras / Vestuário'])"
+                v-for="quickCat in (t.type === 'income' ? ['Salário', 'Outras Receitas'] : ['Alimentação', 'Transporte', 'Moradia', 'Lazer / Viagens', 'Saúde', 'Assinaturas & Serviços', 'Compras / Vestuário'])"
                 :key="quickCat"
                 @click="updateCategory(t, quickCat)"
                 class="quick-cat-pill"
