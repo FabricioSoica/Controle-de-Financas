@@ -47,17 +47,49 @@ const getMonthYearString = (ym) => {
   return `${month}/${year}`;
 };
 
-// Autocalculate total amount when liters or price changes
-watch([refillLiters, refillPricePerLiter], ([liters, price]) => {
-  if (isEditing.value) return; // Do not overwrite during editing unless manual change
-  const l = parseFloat(liters);
-  const p = parseFloat(price);
-  if (!isNaN(l) && !isNaN(p)) {
-    refillTotalAmount.value = parseFloat((l * p).toFixed(2));
-  } else {
-    refillTotalAmount.value = '';
+// Smart auto-calculators for fuel refill form (handles discounts and bi-directional calculation)
+const handleLitersInput = () => {
+  const liters = parseFloat(refillLiters.value);
+  const price = parseFloat(refillPricePerLiter.value);
+  const total = parseFloat(refillTotalAmount.value);
+
+  if (!isNaN(liters) && liters > 0) {
+    if (!isNaN(price) && price > 0 && isNaN(total)) {
+      refillTotalAmount.value = parseFloat((liters * price).toFixed(2));
+    } else if (!isNaN(total) && total > 0) {
+      refillPricePerLiter.value = parseFloat((total / liters).toFixed(3));
+    }
   }
-});
+};
+
+const handlePriceInput = () => {
+  const liters = parseFloat(refillLiters.value);
+  const price = parseFloat(refillPricePerLiter.value);
+  const total = parseFloat(refillTotalAmount.value);
+
+  if (!isNaN(price) && price > 0) {
+    if (!isNaN(liters) && liters > 0) {
+      refillTotalAmount.value = parseFloat((liters * price).toFixed(2));
+    } else if (!isNaN(total) && total > 0) {
+      refillLiters.value = parseFloat((total / price).toFixed(2));
+    }
+  }
+};
+
+const handleTotalInput = () => {
+  const liters = parseFloat(refillLiters.value);
+  const price = parseFloat(refillPricePerLiter.value);
+  const total = parseFloat(refillTotalAmount.value);
+
+  if (!isNaN(total) && total > 0) {
+    if (!isNaN(liters) && liters > 0) {
+      // Calculate price per liter (perfect for pump discounts!)
+      refillPricePerLiter.value = parseFloat((total / liters).toFixed(3));
+    } else if (!isNaN(price) && price > 0) {
+      refillLiters.value = parseFloat((total / price).toFixed(2));
+    }
+  }
+};
 
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return 'R$ 0,00';
@@ -374,6 +406,11 @@ const formatDate = (dateStr) => {
           {{ isEditing ? 'Editar Abastecimento' : 'Novo Abastecimento' }}
         </h3>
         
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: -0.5rem; margin-bottom: 1rem; line-height: 1.3;">
+          <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-warning);"></i>
+          Preencha <strong>Litros</strong> e <strong>Valor Total</strong> para calcular o preço com desconto por litro automaticamente!
+        </p>
+        
         <form @submit.prevent="saveRefill">
           <div class="form-group">
             <label class="form-label">Data</label>
@@ -403,6 +440,7 @@ const formatDate = (dateStr) => {
                 type="number" 
                 step="any"
                 v-model="refillLiters" 
+                @input="handleLitersInput"
                 placeholder="Ex: 9.5" 
                 class="form-input"
                 required
@@ -412,12 +450,15 @@ const formatDate = (dateStr) => {
 
           <div class="form-row-2">
             <div class="form-group">
-              <label class="form-label">Preço/Litro (R$)</label>
+              <label class="form-label">
+                Preço/Litro (R$)
+              </label>
               <input 
                 type="number" 
                 step="any"
                 v-model="refillPricePerLiter" 
-                placeholder="Ex: 5.69" 
+                @input="handlePriceInput"
+                placeholder="Auto ou Ex: 5.69" 
                 class="form-input"
                 required
               />
@@ -428,6 +469,7 @@ const formatDate = (dateStr) => {
                 type="number" 
                 step="any"
                 v-model="refillTotalAmount" 
+                @input="handleTotalInput"
                 placeholder="0,00" 
                 class="form-input"
                 required
