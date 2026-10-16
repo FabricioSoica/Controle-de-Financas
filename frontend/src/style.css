@@ -301,6 +301,7 @@ a:hover {
 .card-fixed::before { background-color: var(--color-warning); }
 .card-variable::before { background-color: var(--color-info); }
 .card-cash::before { background-color: var(--color-cash); }
+.card-balance::before { background-color: var(--color-success); }
 .card-net::before { background: linear-gradient(to bottom, var(--color-primary), #a855f7); }
 
 .card-icon {

@@ -19,6 +19,7 @@ const financeRoutes = require('./routes/finances');
 const shoppingRoutes = require('./routes/shopping');
 const fuelRoutes = require('./routes/fuel');
 const cardRoutes = require('./routes/cards');
+const settingsRoutes = require('./routes/settings');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
@@ -26,6 +27,7 @@ app.use('/api/finances', financeRoutes);
 app.use('/api/shopping', shoppingRoutes);
 app.use('/api/fuel', fuelRoutes);
 app.use('/api/cards', cardRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Start server
 app.listen(PORT, () => {

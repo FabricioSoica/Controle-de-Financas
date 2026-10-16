@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import CategoriesTab from './CategoriesTab.vue';
+import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 
 const props = defineProps({
   token: {
@@ -10,6 +11,10 @@ const props = defineProps({
   apiUrl: {
     type: String,
     required: true
+  },
+  competenceStartDay: {
+    type: Number,
+    default: DEFAULT_COMPETENCE_START_DAY
   }
 });
 
@@ -52,6 +57,7 @@ const registeredCards = ref([]);
 const showCardConfig = ref(false);
 const importLoading = ref(false);
 const visibleCards = ref({
+  balance: true,
   income: true,
   card: true,
   fixed: true,
@@ -61,6 +67,11 @@ const visibleCards = ref({
   cumulative: true
 });
 const isEditingTrans = ref(false);
+
+// Account balance (anchor informed by the user minus account expenses since then)
+const balanceInfo = ref({ configured: false });
+const showBalanceEdit = ref(false);
+const tempBalance = ref('');
 
 // Collapsible Credit Cards State
 const openedCards = ref({});
@@ -99,10 +110,7 @@ onMounted(() => {
     }
   }
 
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
-  selectedMonth.value = `${year}-${month}`;
+  goToCurrentCompetence();
   fetchTransactions();
   fetchMonthlyGoal();
   fetchAnnualEvolution();
@@ -299,8 +307,56 @@ const fetchCategoryConfigs = async () => {
   }
 };
 
+const goToCurrentCompetence = () => {
+  selectedMonth.value = getCompetenceYM(new Date(), props.competenceStartDay);
+};
+
+const fetchBalance = async () => {
+  try {
+    const res = await fetch(`${props.apiUrl}/api/settings/balance`, {
+      headers: getHeaders()
+    });
+    if (res.ok) {
+      balanceInfo.value = await res.json();
+    }
+  } catch (error) {
+    console.error('Error fetching balance:', error);
+  }
+};
+
+const openBalanceEdit = () => {
+  tempBalance.value = balanceInfo.value.configured ? balanceInfo.value.currentBalance : '';
+  showBalanceEdit.value = true;
+};
+
+const saveBalance = async () => {
+  const amount = parseFloat(tempBalance.value);
+  if (isNaN(amount)) {
+    emit('toast', { message: 'Informe um valor de saldo válido.', type: 'error' });
+    return;
+  }
+  try {
+    const res = await fetch(`${props.apiUrl}/api/settings/balance`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ amount })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao salvar saldo');
+    }
+    showBalanceEdit.value = false;
+    emit('toast', { message: 'Saldo da conta atualizado!', type: 'success' });
+    fetchBalance();
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  }
+};
+
 const fetchTransactions = async () => {
   if (!props.token) return;
+  // Any change in transactions may change the account balance
+  fetchBalance();
   try {
     const formattedMonth = getMonthYearString(selectedMonth.value);
     const urlMonth = formattedMonth.replace('/', '-');
@@ -1086,7 +1142,7 @@ const donutSegments = computed(() => {
       <div class="filter-actions-group">
         <button 
           class="btn-today" 
-          @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
+          @click="goToCurrentCompetence"
           type="button"
         >
           Mês Atual
@@ -1130,6 +1186,9 @@ const donutSegments = computed(() => {
           <div v-if="showCardConfig" class="card-config-dropdown">
             <div class="card-config-header">Exibição de Cards</div>
             <label class="config-checkbox-label">
+              <input type="checkbox" v-model="visibleCards.balance" /> Saldo em Conta
+            </label>
+            <label class="config-checkbox-label">
               <input type="checkbox" v-model="visibleCards.income" /> Receita Total
             </label>
             <label class="config-checkbox-label">
@@ -1164,6 +1223,44 @@ const donutSegments = computed(() => {
 
     <!-- Top KPI Grid -->
     <div class="summary-grid">
+      <div v-if="visibleCards.balance" class="summary-card card-balance">
+        <span class="card-icon"><i class="fa-solid fa-building-columns"></i></span>
+        <div class="card-title">Saldo em Conta</div>
+        <template v-if="showBalanceEdit">
+          <form @submit.prevent="saveBalance" class="balance-edit-form">
+            <input 
+              type="number" 
+              step="0.01" 
+              v-model="tempBalance" 
+              class="form-input" 
+              placeholder="Saldo atual no banco" 
+              autofocus
+            />
+            <button type="submit" class="action-btn btn-edit" title="Salvar"><i class="fa-solid fa-check"></i></button>
+            <button type="button" class="action-btn btn-delete" @click="showBalanceEdit = false" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+          </form>
+          <div class="card-sub-calc">Informe o saldo de hoje; os próximos gastos em dinheiro/débito serão descontados.</div>
+        </template>
+        <template v-else-if="balanceInfo.configured">
+          <div class="card-value" :class="balanceInfo.currentBalance >= 0 ? 'text-success' : 'text-danger'">
+            {{ formatCurrency(balanceInfo.currentBalance) }}
+          </div>
+          <div class="card-sub-calc">
+            <span>Desde {{ new Date(balanceInfo.balanceAnchorDate).toLocaleDateString('pt-BR') }}:</span>
+            <span class="sub-calc-val">-{{ formatCurrency(balanceInfo.spentSinceAnchor) }}</span>
+          </div>
+          <button type="button" class="btn-balance-adjust" @click="openBalanceEdit">
+            <i class="fa-solid fa-pen"></i> Ajustar saldo
+          </button>
+        </template>
+        <template v-else>
+          <div class="card-value" style="color: var(--text-secondary);">—</div>
+          <button type="button" class="btn-balance-adjust" @click="openBalanceEdit">
+            <i class="fa-solid fa-plus"></i> Informar saldo atual
+          </button>
+        </template>
+      </div>
+
       <div v-if="visibleCards.income" class="summary-card card-income">
         <span class="card-icon"><i class="fa-solid fa-circle-arrow-up"></i></span>
         <div class="card-title">Receita Total</div>
@@ -2146,6 +2243,37 @@ const donutSegments = computed(() => {
 </template>
 
 <style scoped>
+/* Account balance card */
+.balance-edit-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+
+.balance-edit-form .form-input {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.btn-balance-adjust {
+  margin-top: 0.6rem;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-balance-adjust:hover {
+  color: var(--text-primary);
+  border-color: var(--color-success);
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;

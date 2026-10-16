@@ -4,6 +4,7 @@ const ShoppingItem = require('../models/ShoppingItem');
 const User = require('../models/User');
 const CreditCard = require('../models/CreditCard');
 const FuelRefill = require('../models/FuelRefill');
+const { getCompetenceStartDay, getCompetenceMonth } = require('../utils/competence');
 
 const migrateOrphans = async () => {
   try {
@@ -261,68 +262,43 @@ const migrateFuelAndCategories = async () => {
       console.log(`[Migration] Updated ${catResult.modifiedCount} transactions from Combustível/Gasolina to Transporte.`);
     }
 
-    // 2. Sync all FuelRefills with Transactions and correct invoice months/types
+    // 2. Sync all FuelRefills with their Transactions using the user's competence rule
     const refills = await FuelRefill.find();
+    const startDayByUser = new Map();
 
     let syncedCount = 0;
     for (const r of refills) {
-      const d = new Date(r.date);
-      const day = d.getUTCDate();
-      let year = d.getUTCFullYear();
-      let monthNum = d.getUTCMonth() + 1;
-
-      let expectedType = 'cash';
-      let expectedCardName = '';
-      let expectedMonth = '';
-
-      if (r.paymentType === 'card' && r.cardName && r.cardName.trim()) {
-        expectedType = 'card';
-        expectedCardName = r.cardName.trim();
-        let closingDay = 14;
-
-        const cardConfig = await CreditCard.findOne({ userId: r.userId, cardName: expectedCardName });
-        if (cardConfig && cardConfig.closingDay) {
-          closingDay = cardConfig.closingDay;
-        }
-
-        if (closingDay && day > closingDay) {
-          monthNum += 1;
-          if (monthNum > 12) {
-            monthNum = 1;
-            year += 1;
-          }
-        }
-        expectedMonth = `${String(monthNum).padStart(2, '0')}/${year}`;
-      } else {
-        expectedType = 'cash';
-        expectedMonth = `${String(monthNum).padStart(2, '0')}/${year}`;
+      const userKey = r.userId.toString();
+      if (!startDayByUser.has(userKey)) {
+        startDayByUser.set(userKey, await getCompetenceStartDay(r.userId));
       }
+      const expectedMonth = getCompetenceMonth(r.date, startDayByUser.get(userKey));
+      const isCard = r.paymentType === 'card' && r.cardName && r.cardName.trim();
 
       const transPayload = {
         userId: r.userId,
         description: `Gasolina - ${r.info ? r.info.trim() : 'Abastecimento'}`,
         amount: r.totalAmount,
-        type: expectedType,
-        cardName: expectedCardName,
+        type: isCard ? 'card' : 'cash',
+        cardName: isCard ? r.cardName.trim() : '',
         month: expectedMonth,
         info: `Abastecimento de ${r.liters ? r.liters.toFixed(1) : 0}L (Odômetro: ${r.odometer ? r.odometer.toLocaleString('pt-BR') : 0} km)`,
         category: 'Transporte'
       };
 
-      let existingTrans = null;
       if (r.transactionId) {
-        existingTrans = await Transaction.findOne({ _id: r.transactionId, userId: r.userId });
-      }
-
-      if (existingTrans) {
+        // Keep linked transaction in sync; if the user deleted it, do not recreate it
         await Transaction.updateOne(
-          { _id: existingTrans._id },
+          { _id: r.transactionId, userId: r.userId },
           { $set: transPayload }
         );
       } else {
-        const newTrans = new Transaction(transPayload);
-        const savedTrans = await newTrans.save();
+        const savedTrans = await new Transaction(transPayload).save();
         r.transactionId = savedTrans._id;
+      }
+
+      if (r.month !== expectedMonth || r.isModified('transactionId')) {
+        r.month = expectedMonth;
         await r.save();
       }
       syncedCount++;

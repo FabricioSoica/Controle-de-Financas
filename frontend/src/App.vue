@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { DEFAULT_COMPETENCE_START_DAY } from './utils/competence';
 import AuthScreen from './components/AuthScreen.vue';
 import DashboardTab from './components/DashboardTab.vue';
 import EvolutionTab from './components/EvolutionTab.vue';
@@ -26,6 +27,9 @@ const newCardName = ref('');
 const newCardClosingDay = ref('');
 const newCardDueDay = ref('');
 const configLoading = ref(false);
+const competenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
+const tempCompetenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
+const settingsLoaded = ref(false);
 
 const showToast = (message, type = 'success') => {
   const id = Date.now();
@@ -50,6 +54,54 @@ const fetchCardConfigs = async () => {
     console.error('Error fetching card configs:', error);
   }
 };
+
+const fetchSettings = async () => {
+  if (!token.value) return;
+  try {
+    const res = await fetch(`${API_URL}/api/settings`, {
+      headers: {
+        'Authorization': `Bearer ${token.value}`
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      competenceStartDay.value = data.competenceStartDay;
+      tempCompetenceStartDay.value = data.competenceStartDay;
+    }
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+  } finally {
+    settingsLoaded.value = true;
+  }
+};
+
+const saveCompetenceSettings = async () => {
+  const startDay = parseInt(tempCompetenceStartDay.value, 10);
+  if (isNaN(startDay) || startDay < 1 || startDay > 28) {
+    showToast('O dia de início da competência deve ser entre 1 e 28.', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token.value}`
+      },
+      body: JSON.stringify({ competenceStartDay: startDay })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao salvar configuração');
+    }
+    competenceStartDay.value = startDay;
+    showToast('Início da competência salvo com sucesso!');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+};
+
+fetchSettings();
 
 const saveCardConfig = async () => {
   if (!newCardName.value || !newCardClosingDay.value || !newCardDueDay.value) {
@@ -130,6 +182,7 @@ import { watch } from 'vue';
 watch(showSettingsModal, (isOpen) => {
   if (isOpen) {
     fetchCardConfigs();
+    tempCompetenceStartDay.value = competenceStartDay.value;
   }
 });
 
@@ -150,6 +203,8 @@ const handleAuthSuccess = (data) => {
   localStorage.setItem('financas_userId', data.userId);
   
   activeTab.value = 'dashboard';
+  settingsLoaded.value = false;
+  fetchSettings();
 };
 
 const handleLogout = () => {
@@ -244,9 +299,10 @@ const handleUnauthorized = () => {
     <main v-else>
       <!-- TAB 1: DASHBOARD -->
       <DashboardTab 
-        v-if="activeTab === 'dashboard'" 
+        v-if="activeTab === 'dashboard' && settingsLoaded" 
         :token="token"
         :apiUrl="API_URL"
+        :competenceStartDay="competenceStartDay"
         @toast="handleToast"
         @unauthorized="handleUnauthorized"
       />
@@ -269,9 +325,10 @@ const handleUnauthorized = () => {
 
       <!-- TAB 4: FUEL CONSUMPTION -->
       <FuelTab 
-        v-if="activeTab === 'fuel'" 
+        v-if="activeTab === 'fuel' && settingsLoaded" 
         :token="token"
         :apiUrl="API_URL"
+        :competenceStartDay="competenceStartDay"
         @toast="handleToast"
       />
 
@@ -307,9 +364,31 @@ const handleUnauthorized = () => {
         </div>
         
         <div class="modal-body custom-scroll" style="max-height: 450px; overflow-y: auto; padding: 1.5rem 0;">
-          <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--text-primary);">Dia de Fechamento das Faturas</h4>
+          <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--text-primary);">Início da Competência</h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
+            Dia em que um novo mês financeiro começa (ex.: dia do salário). Antes desse dia, o painel e os abastecimentos continuam no mês anterior.
+          </p>
+          <form @submit.prevent="saveCompetenceSettings" style="display: flex; gap: 0.5rem; align-items: end; margin-bottom: 1.75rem;">
+            <div class="form-group" style="margin-bottom: 0; flex: 1;">
+              <label class="form-label" style="font-size: 0.75rem;">Começa no dia</label>
+              <input 
+                type="number" 
+                v-model="tempCompetenceStartDay" 
+                min="1" 
+                max="28" 
+                class="form-input" 
+                style="padding: 0.4rem 0.75rem; font-size: 0.85rem;"
+                required
+              />
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 0.45rem 1rem; font-size: 0.85rem;">
+              <i class="fa-solid fa-check"></i> Salvar
+            </button>
+          </form>
+
+          <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--text-primary);">Cartões de Crédito</h4>
           <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.4;">
-            Defina o dia limite para compras entrarem na fatura atual. Compras após esse dia caem no mês seguinte.
+            Dias de fechamento e vencimento de cada cartão, exibidos como referência ao lançar compras.
           </p>
           
           <!-- Add Card Config Form -->

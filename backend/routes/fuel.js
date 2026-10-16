@@ -1,47 +1,13 @@
 const express = require('express');
 const FuelRefill = require('../models/FuelRefill');
 const Transaction = require('../models/Transaction');
-const CreditCard = require('../models/CreditCard');
+const { getCompetenceStartDay, getCompetenceMonth } = require('../utils/competence');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
 // Apply authMiddleware to all routes
 router.use(authMiddleware);
-
-// Helper to get month string (MM/YYYY) from a date object or ISO string (timezone-safe)
-const getMonthString = (dateInput) => {
-  const d = new Date(dateInput);
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const year = d.getUTCFullYear();
-  return `${month}/${year}`;
-};
-
-// Helper to compute target transaction month (respecting credit card closingDay if type is card)
-const getTransactionMonth = async (userId, dateInput, paymentType, cardName) => {
-  const d = new Date(dateInput);
-  const day = d.getUTCDate();
-  let year = d.getUTCFullYear();
-  let monthNum = d.getUTCMonth() + 1;
-
-  if (paymentType === 'card' && cardName) {
-    let closingDay = 14;
-    const cardConfig = await CreditCard.findOne({ userId, cardName: cardName.trim() });
-    if (cardConfig && cardConfig.closingDay) {
-      closingDay = cardConfig.closingDay;
-    }
-    if (closingDay && day > closingDay) {
-      monthNum += 1;
-      if (monthNum > 12) {
-        monthNum = 1;
-        year += 1;
-      }
-    }
-  }
-
-  const monthStr = String(monthNum).padStart(2, '0');
-  return `${monthStr}/${year}`;
-};
 
 // GET /api/fuel - Get all refills with calculated km/l
 router.get('/', async (req, res) => {
@@ -142,12 +108,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: data, odômetro, litros, preço por litro e valor total são obrigatórios.' });
     }
     
-    const refillMonth = getMonthString(date);
+    // Refill and its linked transaction share the same competence
+    const startDay = await getCompetenceStartDay(req.user.id);
+    const refillMonth = getCompetenceMonth(date, startDay);
     const resolvedPaymentType = paymentType || 'money';
     const cleanCardName = resolvedPaymentType === 'card' && cardName ? cardName.trim() : '';
 
     const transType = resolvedPaymentType === 'card' ? 'card' : 'cash';
-    const transMonth = await getTransactionMonth(req.user.id, date, resolvedPaymentType, cleanCardName);
 
     // Create linked transaction for general financial tracking (both card and cash)
     const newTrans = new Transaction({
@@ -156,7 +123,7 @@ router.post('/', async (req, res) => {
       amount: parseFloat(totalAmount),
       type: transType,
       cardName: cleanCardName,
-      month: transMonth,
+      month: refillMonth,
       info: `Abastecimento de ${parseFloat(liters).toFixed(1)}L (Odômetro: ${parseFloat(odometer).toLocaleString('pt-BR')} km)`,
       category: 'Transporte'
     });
@@ -204,7 +171,8 @@ router.put('/:id', async (req, res) => {
     const newOdometer = odometer !== undefined ? parseFloat(odometer) : refill.odometer;
     
     const transType = newPaymentType === 'card' ? 'card' : 'cash';
-    const transMonth = await getTransactionMonth(req.user.id, newDate, newPaymentType, cleanCardName);
+    const startDay = await getCompetenceStartDay(req.user.id);
+    const transMonth = getCompetenceMonth(newDate, startDay);
     
     let transactionId = refill.transactionId;
     
@@ -236,13 +204,11 @@ router.put('/:id', async (req, res) => {
     const updatedFields = {
       paymentType: newPaymentType,
       cardName: cleanCardName,
-      transactionId
+      transactionId,
+      month: transMonth
     };
     
-    if (date !== undefined) {
-      updatedFields.date = newDate;
-      updatedFields.month = getMonthString(date);
-    }
+    if (date !== undefined) updatedFields.date = newDate;
     if (odometer !== undefined) updatedFields.odometer = newOdometer;
     if (liters !== undefined) updatedFields.liters = newLiters;
     if (pricePerLiter !== undefined) updatedFields.pricePerLiter = parseFloat(pricePerLiter);

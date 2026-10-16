@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 
 const props = defineProps({
   token: {
@@ -9,6 +10,10 @@ const props = defineProps({
   apiUrl: {
     type: String,
     required: true
+  },
+  competenceStartDay: {
+    type: Number,
+    default: DEFAULT_COMPETENCE_START_DAY
   }
 });
 
@@ -139,13 +144,17 @@ const fetchConfiguredCards = async () => {
   }
 };
 
+const goToCurrentCompetence = () => {
+  selectedMonth.value = getCompetenceYM(new Date(), props.competenceStartDay);
+};
+
 onMounted(() => {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   refillDate.value = `${year}-${month}-${day}`;
-  selectedMonth.value = `${year}-${month}`;
+  goToCurrentCompetence();
   
   fetchRefills();
   fetchSummary();
@@ -339,7 +348,7 @@ const formatDate = (dateStr) => {
         />
         <button 
           class="btn-today" 
-          @click="selectedMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`"
+          @click="goToCurrentCompetence"
           type="button"
         >
           Mês Atual
