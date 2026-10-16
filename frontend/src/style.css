@@ -2035,6 +2035,24 @@ a:hover {
   animation: dropdownSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Opens above the trigger when there is not enough room below */
+.custom-select-dropdown.drop-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation-name: dropdownSlideUp;
+}
+
+@keyframes dropdownSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes dropdownSlideIn {
   from {
     opacity: 0;
@@ -2143,6 +2161,8 @@ a:hover {
   flex-direction: column;
   gap: 0.25rem;
   max-height: 220px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 0.3rem;
 }

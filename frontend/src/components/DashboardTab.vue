@@ -998,10 +998,31 @@ const availableCategories = computed(() => {
 const isCategoryDropdownOpen = ref(false);
 const categorySearchQuery = ref('');
 const categorySearchInputRef = ref(null);
+const categoryDropUp = ref(false);
+const categoryDropdownMaxHeight = ref(380);
+
+// Open the dropdown where it fits: upwards when there is not enough room below the trigger,
+// and never taller than the available space so the options list scrolls inside it
+const positionCategoryDropdown = () => {
+  const wrapper = document.getElementById('custom-category-select-wrapper');
+  const trigger = wrapper && wrapper.querySelector('.custom-select-trigger');
+  if (!trigger) return;
+
+  const rect = trigger.getBoundingClientRect();
+  const margin = 16;
+  const spaceBelow = window.innerHeight - rect.bottom - margin;
+  const spaceAbove = rect.top - margin;
+  const preferredHeight = 380;
+
+  categoryDropUp.value = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+  const available = categoryDropUp.value ? spaceAbove : spaceBelow;
+  categoryDropdownMaxHeight.value = Math.max(200, Math.min(preferredHeight, available));
+};
 
 const toggleCategoryDropdown = () => {
   isCategoryDropdownOpen.value = !isCategoryDropdownOpen.value;
   if (isCategoryDropdownOpen.value) {
+    positionCategoryDropdown();
     categorySearchQuery.value = '';
     setTimeout(() => {
       if (categorySearchInputRef.value) {
@@ -1623,7 +1644,12 @@ const donutSegments = computed(() => {
             </div>
 
             <!-- Custom Category Dropdown Menu Overlay -->
-            <div v-if="isCategoryDropdownOpen" class="custom-select-dropdown custom-scroll">
+            <div 
+              v-if="isCategoryDropdownOpen" 
+              class="custom-select-dropdown custom-scroll"
+              :class="{ 'drop-up': categoryDropUp }"
+              :style="{ maxHeight: categoryDropdownMaxHeight + 'px' }"
+            >
               <!-- Search Bar inside Dropdown -->
               <div class="dropdown-search-wrapper" @click.stop>
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
