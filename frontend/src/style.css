@@ -679,6 +679,12 @@ a:hover {
 .btn-edit:hover {
   background: rgba(59, 130, 246, 0.15);
 }
+.btn-purchase {
+  color: var(--color-success);
+}
+.btn-purchase:hover {
+  background: rgba(16, 185, 129, 0.15);
+}
 .btn-delete {
   color: var(--color-danger);
 }

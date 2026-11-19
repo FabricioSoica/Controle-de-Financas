@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import PurchaseItemModal from './PurchaseItemModal.vue';
+import { DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 
 const props = defineProps({
   token: {
@@ -9,6 +11,10 @@ const props = defineProps({
   apiUrl: {
     type: String,
     required: true
+  },
+  competenceStartDay: {
+    type: Number,
+    default: DEFAULT_COMPETENCE_START_DAY
   }
 });
 
@@ -23,6 +29,14 @@ const shopName = ref('');
 const shopLink = ref('');
 const shopPrice = ref('');
 const isEditingShop = ref(false);
+const purchasingItem = ref(null);
+
+const handlePurchased = () => {
+  emit('toast', { message: `Compra de "${purchasingItem.value.name}" registrada nos lançamentos!`, type: 'success' });
+  if (shopId.value === purchasingItem.value._id) resetShopForm();
+  purchasingItem.value = null;
+  fetchShoppingItems();
+};
 
 // Drag and drop state
 const draggedItem = ref(null);
@@ -364,6 +378,9 @@ const totalShoppingPrice = computed(() => shoppingItems.value.reduce((sum, item)
 
           <!-- Action buttons -->
           <div class="shopping-actions">
+            <button class="action-btn btn-purchase" @click="purchasingItem = item" type="button" title="Comprei: registrar lançamento">
+              <i class="fa-solid fa-bag-shopping"></i>
+            </button>
             <button class="action-btn btn-edit" @click="editShoppingItem(item)" type="button">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -372,6 +389,17 @@ const totalShoppingPrice = computed(() => shoppingItems.value.reduce((sum, item)
             </button>
           </div>
         </div>
+
+        <PurchaseItemModal
+          v-if="purchasingItem"
+          :item="purchasingItem"
+          :token="token"
+          :apiUrl="apiUrl"
+          :competenceStartDay="competenceStartDay"
+          @close="purchasingItem = null"
+          @purchased="handlePurchased"
+          @toast="emit('toast', $event)"
+        />
 
         <!-- Empty state -->
         <div v-if="shoppingItems.length === 0" class="empty-state">

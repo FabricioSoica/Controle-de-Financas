@@ -344,9 +344,10 @@ const handleUnauthorized = () => {
 
       <!-- TAB 3: SHOPPING LIST -->
       <ShoppingTab 
-        v-if="activeTab === 'shopping'" 
+        v-if="activeTab === 'shopping' && settingsLoaded" 
         :token="token"
         :apiUrl="API_URL"
+        :competenceStartDay="competenceStartDay"
         @toast="handleToast"
       />
 
