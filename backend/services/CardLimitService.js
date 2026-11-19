@@ -25,6 +25,7 @@ class CardLimitService {
     const targetCompetence = competence || currentCompetence;
     const targetKey = toCompetenceKey(targetCompetence);
     const calendar = new InvoiceCalendar(startDay);
+    const today = new Date();
 
     const [cards, transactions] = await Promise.all([
       CreditCard.find({ userId: this.userId }).sort({ cardName: 1 }).lean(),
@@ -42,7 +43,8 @@ class CardLimitService {
       return this.buildCardSummary(card, {
         used: sumAmounts(openByCard.get(cardKey)),
         invoiceAmount: sumAmounts(invoiceByCard.get(cardKey)),
-        invoiceDueDate: calendar.getCompetenceDueDate(targetCompetence, card.dueDay)
+        invoiceDueDate: calendar.getCompetenceDueDate(targetCompetence, card.dueDay),
+        purchaseToday: calendar.getPurchaseDueDate(today, card.closingDay, card.dueDay)
       });
     });
 
@@ -50,8 +52,19 @@ class CardLimitService {
       competence: targetCompetence,
       currentCompetence,
       cards: cardSummaries,
-      totals: this.buildTotals(cardSummaries)
+      totals: this.buildTotals(cardSummaries),
+      bestCardForToday: this.findBestCardForToday(cardSummaries)
     };
+  }
+
+  // The card whose purchase today is paid the latest; none when every eligible card ties
+  findBestCardForToday(cardSummaries) {
+    const eligible = cardSummaries.filter(c => c.limit === 0 || c.available > 0);
+    if (eligible.length < 2) return null;
+
+    const maxDays = Math.max(...eligible.map(c => c.purchaseToday.daysToPay));
+    const best = eligible.filter(c => c.purchaseToday.daysToPay === maxDays);
+    return best.length < eligible.length ? best[0]._id : null;
   }
 
   // Position of the limit at the given competence: purchases made up to it whose installments are
@@ -80,7 +93,7 @@ class CardLimitService {
     return groups;
   }
 
-  buildCardSummary(card, { used, invoiceAmount, invoiceDueDate }) {
+  buildCardSummary(card, { used, invoiceAmount, invoiceDueDate, purchaseToday }) {
     const limit = card.limit || 0;
     return {
       _id: card._id,
@@ -94,7 +107,8 @@ class CardLimitService {
       invoice: {
         amount: round(invoiceAmount),
         dueDate: invoiceDueDate
-      }
+      },
+      purchaseToday
     };
   }
 

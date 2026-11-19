@@ -46,6 +46,8 @@ const periodView = computed(() => {
   return { label: 'Atual', icon: 'fa-location-dot', className: 'current' };
 });
 
+const isCurrentView = computed(() => periodView.value.className === 'current');
+
 const fetchLimits = async () => {
   if (!selectedMonth.value) return;
   loading.value = true;
@@ -145,7 +147,15 @@ onMounted(fetchLimits);
       </div>
 
       <div class="limits-grid">
-        <div v-for="card in summary.cards" :key="card._id" class="limit-card">
+        <div 
+          v-for="card in summary.cards" 
+          :key="card._id" 
+          class="limit-card" 
+          :class="{ 'best-for-today': isCurrentView && card._id === summary.bestCardForToday }"
+        >
+          <span v-if="isCurrentView && card._id === summary.bestCardForToday" class="best-card-badge">
+            <i class="fa-solid fa-star"></i> Melhor para comprar hoje
+          </span>
           <div class="limit-card-header">
             <span class="limit-card-name"><i class="fa-solid fa-credit-card"></i> {{ card.cardName }}</span>
             <span class="limit-card-days">Fecha {{ card.closingDay }} · Vence {{ card.dueDay }}</span>
@@ -154,6 +164,12 @@ onMounted(fetchLimits);
           <div class="limit-invoice">
             <span class="limit-label">Fatura {{ formatMonthLabel(selectedMonth) }} · vence {{ formatShortDate(card.invoice.dueDate) }}</span>
             <span class="limit-invoice-value">{{ formatCurrency(card.invoice.amount) }}</span>
+          </div>
+
+          <div v-if="isCurrentView" class="limit-purchase-today">
+            <i class="fa-solid fa-cart-shopping"></i>
+            Comprando hoje, paga em {{ formatShortDate(card.purchaseToday.dueDate) }}
+            <strong>({{ card.purchaseToday.daysToPay }} dias)</strong>
           </div>
 
           <template v-if="card.limit > 0">
@@ -272,6 +288,35 @@ onMounted(fetchLimits);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.limit-card.best-for-today {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.12);
+}
+
+.best-card-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-success);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.limit-purchase-today {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.limit-purchase-today i {
+  margin-right: 0.25rem;
+  opacity: 0.7;
 }
 
 .limit-card-header {
