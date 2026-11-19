@@ -32,7 +32,7 @@ class CardLimitService {
       Transaction.find({
         userId: this.userId,
         $or: [{ type: 'card' }, { type: 'fixed', cardName: { $nin: ['', null] } }]
-      }).select('amount cardName month type description').lean()
+      }).select('amount cardName month type description category').lean()
     ]);
 
     const openByCard = this.groupByCard(transactions, t => this.isOpenAt(t, targetKey));
@@ -40,8 +40,10 @@ class CardLimitService {
 
     const cardSummaries = cards.map(card => {
       const cardKey = normalizeCardName(card.cardName);
+      const openItems = openByCard.get(cardKey) || [];
       return this.buildCardSummary(card, {
-        used: sumAmounts(openByCard.get(cardKey)),
+        items: this.toItems(openItems),
+        used: sumAmounts(openItems),
         invoiceAmount: sumAmounts(invoiceByCard.get(cardKey)),
         invoiceDueDate: calendar.getCompetenceDueDate(targetCompetence, card.dueDay),
         purchaseToday: calendar.getPurchaseDueDate(today, card.closingDay, card.dueDay)
@@ -93,7 +95,20 @@ class CardLimitService {
     return groups;
   }
 
-  buildCardSummary(card, { used, invoiceAmount, invoiceDueDate, purchaseToday }) {
+  toItems(transactions) {
+    return transactions
+      .map(t => ({
+        _id: t._id,
+        description: t.description,
+        amount: round(t.amount),
+        month: t.month,
+        type: t.type,
+        category: t.category || 'Outros'
+      }))
+      .sort((a, b) => toCompetenceKey(a.month).localeCompare(toCompetenceKey(b.month)) || a.description.localeCompare(b.description));
+  }
+
+  buildCardSummary(card, { items, used, invoiceAmount, invoiceDueDate, purchaseToday }) {
     const limit = card.limit || 0;
     return {
       _id: card._id,
@@ -108,7 +123,8 @@ class CardLimitService {
         amount: round(invoiceAmount),
         dueDate: invoiceDueDate
       },
-      purchaseToday
+      purchaseToday,
+      items
     };
   }
 

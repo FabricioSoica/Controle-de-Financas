@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { formatCurrency, formatShortDate } from '../utils/format';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
+import BaseModal from './BaseModal.vue';
 
 const props = defineProps({
   token: {
@@ -47,6 +48,20 @@ const periodView = computed(() => {
 });
 
 const isCurrentView = computed(() => periodView.value.className === 'current');
+
+const detailCard = ref(null);
+
+const detailGroups = computed(() => {
+  if (!detailCard.value) return [];
+  const groups = new Map();
+  for (const item of detailCard.value.items) {
+    if (!groups.has(item.month)) groups.set(item.month, { month: item.month, total: 0, items: [] });
+    const group = groups.get(item.month);
+    group.total += item.amount;
+    group.items.push(item);
+  }
+  return [...groups.values()];
+});
 
 const fetchLimits = async () => {
   if (!selectedMonth.value) return;
@@ -152,6 +167,10 @@ onMounted(fetchLimits);
           :key="card._id" 
           class="limit-card" 
           :class="{ 'best-for-today': isCurrentView && card._id === summary.bestCardForToday }"
+          @click="detailCard = card"
+          role="button"
+          tabindex="0"
+          @keydown.enter="detailCard = card"
         >
           <span v-if="isCurrentView && card._id === summary.bestCardForToday" class="best-card-badge">
             <i class="fa-solid fa-star"></i> Melhor para comprar hoje
@@ -201,12 +220,48 @@ onMounted(fetchLimits);
                 <span class="limit-value text-danger">{{ formatCurrency(card.used) }}</span>
               </div>
             </div>
-            <button type="button" class="btn-link" @click="emit('open-settings')">
+            <button type="button" class="btn-link" @click.stop="emit('open-settings')">
               <i class="fa-solid fa-gear"></i> Definir limite deste cartão
             </button>
           </template>
+
+          <span class="limit-details-link">
+            <i class="fa-solid fa-list-ul"></i> Ver lançamentos ({{ card.items.length }})
+          </span>
         </div>
       </div>
+
+      <BaseModal 
+        v-if="detailCard" 
+        :title="`${detailCard.cardName} · em uso em ${formatMonthLabel(selectedMonth)}`" 
+        icon="fa-credit-card" 
+        max-width="560px"
+        @close="detailCard = null"
+      >
+        <div v-if="detailGroups.length === 0" class="details-empty">
+          Nenhum lançamento em aberto neste cartão.
+        </div>
+        <div v-for="group in detailGroups" :key="group.month" class="details-group">
+          <div class="details-group-header">
+            <span>Fatura {{ group.month }}</span>
+            <span>{{ formatCurrency(group.total) }}</span>
+          </div>
+          <div v-for="item in group.items" :key="item._id" class="details-item">
+            <div class="details-item-info">
+              <span class="details-item-desc">{{ item.description }}</span>
+              <span class="details-item-meta">
+                {{ item.category }}
+                <span v-if="item.type === 'fixed'" class="details-item-tag">Assinatura</span>
+              </span>
+            </div>
+            <span class="details-item-amount">{{ formatCurrency(item.amount) }}</span>
+          </div>
+        </div>
+        <div class="details-total">
+          <span>Total em uso</span>
+          <span>{{ formatCurrency(detailCard.used) }}</span>
+        </div>
+      </BaseModal>
 
       <p class="limits-footnote">
         <template v-if="periodView.className === 'future'">
@@ -288,6 +343,97 @@ onMounted(fetchLimits);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.limit-card {
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.limit-card:hover,
+.limit-card:focus-visible {
+  border-color: rgba(99, 102, 241, 0.4);
+  outline: none;
+}
+
+.limit-details-link {
+  font-size: 0.8rem;
+  color: var(--color-primary);
+  margin-top: auto;
+}
+
+.details-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1.5rem 0;
+}
+
+.details-group + .details-group {
+  margin-top: 1rem;
+}
+
+.details-group-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-warning);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.details-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.details-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.details-item-desc {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.details-item-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.details-item-tag {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  color: var(--color-primary);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.details-item-amount {
+  font-weight: 600;
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+.details-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .limit-card.best-for-today {
