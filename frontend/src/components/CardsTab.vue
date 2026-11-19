@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatShortDate } from '../utils/format';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 
 const props = defineProps({
@@ -136,6 +136,12 @@ onMounted(fetchLimits);
             <span v-else>Faturas abertas e parcelas futuras</span>
           </div>
         </div>
+        <div class="summary-card limits-invoice">
+          <span class="card-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+          <div class="card-title">Faturas de {{ formatMonthLabel(selectedMonth) }}</div>
+          <div class="card-value text-warning">{{ formatCurrency(summary.totals.invoiceAmount) }}</div>
+          <div class="card-sub-calc">Soma das faturas dos cartões</div>
+        </div>
       </div>
 
       <div class="limits-grid">
@@ -143,6 +149,11 @@ onMounted(fetchLimits);
           <div class="limit-card-header">
             <span class="limit-card-name"><i class="fa-solid fa-credit-card"></i> {{ card.cardName }}</span>
             <span class="limit-card-days">Fecha {{ card.closingDay }} · Vence {{ card.dueDay }}</span>
+          </div>
+
+          <div class="limit-invoice">
+            <span class="limit-label">Fatura {{ formatMonthLabel(selectedMonth) }} · vence {{ formatShortDate(card.invoice.dueDate) }}</span>
+            <span class="limit-invoice-value">{{ formatCurrency(card.invoice.amount) }}</span>
           </div>
 
           <template v-if="card.limit > 0">
@@ -244,6 +255,7 @@ onMounted(fetchLimits);
 .limits-total::before { background-color: var(--color-primary); }
 .limits-available::before { background-color: var(--color-success); }
 .limits-used::before { background-color: var(--color-danger); }
+.limits-invoice::before { background-color: var(--color-warning); }
 
 .limits-grid {
   display: grid;
@@ -285,6 +297,22 @@ onMounted(fetchLimits);
   font-size: 0.75rem;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.limit-invoice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.limit-invoice-value {
+  font-weight: 700;
+  color: var(--color-warning);
 }
 
 .limit-bar {

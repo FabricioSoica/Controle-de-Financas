@@ -1,5 +1,6 @@
 const CreditCard = require('../models/CreditCard');
 const Transaction = require('../models/Transaction');
+const InvoiceCalendar = require('./InvoiceCalendar');
 const {
   getCompetenceStartDay,
   getCompetenceMonth,
@@ -11,6 +12,7 @@ const INSTALLMENT_SUFFIX = /\((\d+)\/\d+\)\s*$/;
 
 const round = (value) => parseFloat(value.toFixed(2));
 const normalizeCardName = (name) => (name || '').trim().toLowerCase();
+const sumAmounts = (transactions = []) => transactions.reduce((sum, t) => sum + t.amount, 0);
 
 class CardLimitService {
   constructor(userId) {
@@ -21,6 +23,8 @@ class CardLimitService {
     const startDay = await getCompetenceStartDay(this.userId);
     const currentCompetence = getCompetenceMonth(new Date(), startDay);
     const targetCompetence = competence || currentCompetence;
+    const targetKey = toCompetenceKey(targetCompetence);
+    const calendar = new InvoiceCalendar(startDay);
 
     const [cards, transactions] = await Promise.all([
       CreditCard.find({ userId: this.userId }).sort({ cardName: 1 }).lean(),
@@ -30,8 +34,17 @@ class CardLimitService {
       }).select('amount cardName month type description').lean()
     ]);
 
-    const usedByCard = this.sumOpenAmountsByCard(transactions, toCompetenceKey(targetCompetence));
-    const cardSummaries = cards.map(card => this.buildCardSummary(card, usedByCard.get(normalizeCardName(card.cardName)) || 0));
+    const openByCard = this.groupByCard(transactions, t => this.isOpenAt(t, targetKey));
+    const invoiceByCard = this.groupByCard(transactions, t => toCompetenceKey(t.month) === targetKey);
+
+    const cardSummaries = cards.map(card => {
+      const cardKey = normalizeCardName(card.cardName);
+      return this.buildCardSummary(card, {
+        used: sumAmounts(openByCard.get(cardKey)),
+        invoiceAmount: sumAmounts(invoiceByCard.get(cardKey)),
+        invoiceDueDate: calendar.getCompetenceDueDate(targetCompetence, card.dueDay)
+      });
+    });
 
     return {
       competence: targetCompetence,
@@ -43,21 +56,10 @@ class CardLimitService {
 
   // Position of the limit at the given competence: purchases made up to it whose installments are
   // still unpaid (its own invoice onwards), plus fixed subscriptions charged in it
-  sumOpenAmountsByCard(transactions, targetKey) {
-    const usedByCard = new Map();
-
-    for (const t of transactions) {
-      const key = toCompetenceKey(t.month);
-      const isOpen = t.type === 'card'
-        ? key >= targetKey && this.getPurchaseCompetenceKey(t) <= targetKey
-        : key === targetKey;
-      if (!isOpen) continue;
-
-      const cardKey = normalizeCardName(t.cardName);
-      usedByCard.set(cardKey, (usedByCard.get(cardKey) || 0) + t.amount);
-    }
-
-    return usedByCard;
+  isOpenAt(transaction, targetKey) {
+    const key = toCompetenceKey(transaction.month);
+    if (transaction.type !== 'card') return key === targetKey;
+    return key >= targetKey && this.getPurchaseCompetenceKey(transaction) <= targetKey;
   }
 
   // Installment "Notebook (09/18)" in 11/2026 was bought 8 competences earlier, in 03/2026
@@ -67,7 +69,18 @@ class CardLimitService {
     return toCompetenceKey(shiftCompetence(transaction.month, -(installmentNumber - 1)));
   }
 
-  buildCardSummary(card, used) {
+  groupByCard(transactions, predicate) {
+    const groups = new Map();
+    for (const t of transactions) {
+      if (!predicate(t)) continue;
+      const cardKey = normalizeCardName(t.cardName);
+      if (!groups.has(cardKey)) groups.set(cardKey, []);
+      groups.get(cardKey).push(t);
+    }
+    return groups;
+  }
+
+  buildCardSummary(card, { used, invoiceAmount, invoiceDueDate }) {
     const limit = card.limit || 0;
     return {
       _id: card._id,
@@ -77,18 +90,24 @@ class CardLimitService {
       limit: round(limit),
       used: round(used),
       available: round(limit - used),
-      usagePercent: limit > 0 ? round((used / limit) * 100) : null
+      usagePercent: limit > 0 ? round((used / limit) * 100) : null,
+      invoice: {
+        amount: round(invoiceAmount),
+        dueDate: invoiceDueDate
+      }
     };
   }
 
   buildTotals(cardSummaries) {
     const limit = cardSummaries.reduce((sum, c) => sum + c.limit, 0);
     const used = cardSummaries.reduce((sum, c) => sum + c.used, 0);
+    const invoiceAmount = cardSummaries.reduce((sum, c) => sum + c.invoice.amount, 0);
     return {
       limit: round(limit),
       used: round(used),
       available: round(limit - used),
-      usagePercent: limit > 0 ? round((used / limit) * 100) : null
+      usagePercent: limit > 0 ? round((used / limit) * 100) : null,
+      invoiceAmount: round(invoiceAmount)
     };
   }
 }
