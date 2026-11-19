@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
+import { useFuelPriceCalculator } from '../composables/useFuelPriceCalculator';
 
 const props = defineProps({
   token: {
@@ -54,49 +55,11 @@ const getMonthYearString = (ym) => {
   return `${month}/${year}`;
 };
 
-// Smart auto-calculators for fuel refill form (handles discounts and bi-directional calculation)
-const handleLitersInput = () => {
-  const liters = parseFloat(refillLiters.value);
-  const price = parseFloat(refillPricePerLiter.value);
-  const total = parseFloat(refillTotalAmount.value);
-
-  if (!isNaN(liters) && liters > 0) {
-    if (!isNaN(price) && price > 0 && isNaN(total)) {
-      refillTotalAmount.value = parseFloat((liters * price).toFixed(2));
-    } else if (!isNaN(total) && total > 0) {
-      refillPricePerLiter.value = parseFloat((total / liters).toFixed(3));
-    }
-  }
-};
-
-const handlePriceInput = () => {
-  const liters = parseFloat(refillLiters.value);
-  const price = parseFloat(refillPricePerLiter.value);
-  const total = parseFloat(refillTotalAmount.value);
-
-  if (!isNaN(price) && price > 0) {
-    if (!isNaN(liters) && liters > 0) {
-      refillTotalAmount.value = parseFloat((liters * price).toFixed(2));
-    } else if (!isNaN(total) && total > 0) {
-      refillLiters.value = parseFloat((total / price).toFixed(2));
-    }
-  }
-};
-
-const handleTotalInput = () => {
-  const liters = parseFloat(refillLiters.value);
-  const price = parseFloat(refillPricePerLiter.value);
-  const total = parseFloat(refillTotalAmount.value);
-
-  if (!isNaN(total) && total > 0) {
-    if (!isNaN(liters) && liters > 0) {
-      // Calculate price per liter (perfect for pump discounts!)
-      refillPricePerLiter.value = parseFloat((total / liters).toFixed(3));
-    } else if (!isNaN(price) && price > 0) {
-      refillLiters.value = parseFloat((total / price).toFixed(2));
-    }
-  }
-};
+const priceCalculator = useFuelPriceCalculator({
+  liters: refillLiters,
+  price: refillPricePerLiter,
+  total: refillTotalAmount
+});
 
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return 'R$ 0,00';
@@ -279,6 +242,7 @@ const editRefill = (r) => {
   refillInfo.value = r.info || '';
   refillRegisterInFinances.value = r.registerInFinances !== false;
   refillFullTank.value = Boolean(r.fullTank);
+  priceCalculator.startEditing();
   isEditing.value = true;
   scrollToForm();
 };
@@ -315,6 +279,7 @@ const resetForm = () => {
   refillInfo.value = '';
   refillRegisterInFinances.value = true;
   refillFullTank.value = false;
+  priceCalculator.reset();
   isEditing.value = false;
 };
 
@@ -439,7 +404,7 @@ const formatDate = (dateStr) => {
                 type="number" 
                 step="any"
                 v-model="refillLiters" 
-                @input="handleLitersInput"
+                @input="priceCalculator.onInput('liters')"
                 placeholder="Ex: 9.5" 
                 class="form-input"
                 required
@@ -456,7 +421,7 @@ const formatDate = (dateStr) => {
                 type="number" 
                 step="any"
                 v-model="refillPricePerLiter" 
-                @input="handlePriceInput"
+                @input="priceCalculator.onInput('price')"
                 placeholder="Auto ou Ex: 5.69" 
                 class="form-input"
                 required
@@ -468,13 +433,14 @@ const formatDate = (dateStr) => {
                 type="number" 
                 step="any"
                 v-model="refillTotalAmount" 
-                @input="handleTotalInput"
+                @input="priceCalculator.onInput('total')"
                 placeholder="0,00" 
                 class="form-input"
                 required
               />
             </div>
           </div>
+          <p class="calculator-hint">Preencha dois entre litros, preço e total: o terceiro é calculado.</p>
 
           <div class="form-row-2">
             <div class="form-group">
@@ -792,6 +758,12 @@ const formatDate = (dateStr) => {
   font-weight: 600;
   font-size: 0.75rem;
   display: inline-block;
+}
+
+.calculator-hint {
+  margin: -0.4rem 0 1rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .full-tank-badge {
