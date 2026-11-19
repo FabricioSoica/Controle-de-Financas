@@ -3,6 +3,8 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { formatCurrency, formatShortDate } from '../utils/format';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 import BaseModal from './BaseModal.vue';
+import CardLimitProjectionChart from './CardLimitProjectionChart.vue';
+import { getSeriesColor } from '../utils/chartPalette';
 
 const props = defineProps({
   token: {
@@ -26,6 +28,7 @@ const props = defineProps({
 const emit = defineEmits(['toast', 'open-settings']);
 
 const summary = ref(null);
+const projection = ref(null);
 const loading = ref(false);
 const currentMonth = getCompetenceYM(new Date(), props.competenceStartDay);
 const selectedMonth = ref(currentMonth);
@@ -48,6 +51,27 @@ const periodView = computed(() => {
 });
 
 const isCurrentView = computed(() => periodView.value.className === 'current');
+
+const cardColors = computed(() => new Map(
+  (projection.value ? projection.value.cards : []).map((card, index) => [card._id, getSeriesColor(index)])
+));
+
+const selectCompetence = (competence) => {
+  const [month, year] = competence.split('/');
+  selectedMonth.value = `${year}-${month}`;
+};
+
+const fetchProjection = async () => {
+  try {
+    const res = await fetch(`${props.apiUrl}/api/cards/limits/projection`, {
+      headers: { 'Authorization': `Bearer ${props.token}` }
+    });
+    if (!res.ok) throw new Error('Falha ao buscar projeção dos limites');
+    projection.value = await res.json();
+  } catch (error) {
+    emit('toast', { message: error.message, type: 'error' });
+  }
+};
 
 const detailCard = ref(null);
 
@@ -89,9 +113,14 @@ const usageLevel = (percent) => {
 
 const barWidth = (percent) => `${Math.min(Math.max(percent || 0, 0), 100)}%`;
 
+const refreshAll = () => {
+  fetchLimits();
+  fetchProjection();
+};
+
 watch(selectedMonth, fetchLimits);
-watch(() => props.settingsVersion, fetchLimits);
-onMounted(fetchLimits);
+watch(() => props.settingsVersion, refreshAll);
+onMounted(refreshAll);
 </script>
 
 <template>
@@ -176,7 +205,9 @@ onMounted(fetchLimits);
             <i class="fa-solid fa-star"></i> Melhor para comprar hoje
           </span>
           <div class="limit-card-header">
-            <span class="limit-card-name"><i class="fa-solid fa-credit-card"></i> {{ card.cardName }}</span>
+            <span class="limit-card-name">
+              <span class="card-color-dot" :style="{ background: cardColors.get(card._id) }"></span>{{ card.cardName }}
+            </span>
             <span class="limit-card-days">Fecha {{ card.closingDay }} · Vence {{ card.dueDay }}</span>
           </div>
 
@@ -230,6 +261,13 @@ onMounted(fetchLimits);
           </span>
         </div>
       </div>
+
+      <CardLimitProjectionChart 
+        v-if="projection && projection.cards.length > 0" 
+        :projection="projection" 
+        :selected-competence="formatMonthLabel(selectedMonth)" 
+        @select-competence="selectCompetence"
+      />
 
       <BaseModal 
         v-if="detailCard" 
@@ -478,10 +516,13 @@ onMounted(fetchLimits);
   color: var(--text-primary);
 }
 
-.limit-card-name i {
-  color: var(--color-danger);
-  opacity: 0.8;
-  margin-right: 0.25rem;
+.card-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 0.5rem;
+  background: var(--text-muted);
 }
 
 .limit-card-days {

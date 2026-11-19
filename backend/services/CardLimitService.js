@@ -19,14 +19,8 @@ class CardLimitService {
     this.userId = userId;
   }
 
-  async getSummary(competence = null) {
+  async loadContext() {
     const startDay = await getCompetenceStartDay(this.userId);
-    const currentCompetence = getCompetenceMonth(new Date(), startDay);
-    const targetCompetence = competence || currentCompetence;
-    const targetKey = toCompetenceKey(targetCompetence);
-    const calendar = new InvoiceCalendar(startDay);
-    const today = new Date();
-
     const [cards, transactions] = await Promise.all([
       CreditCard.find({ userId: this.userId }).sort({ cardName: 1 }).lean(),
       Transaction.find({
@@ -34,6 +28,15 @@ class CardLimitService {
         $or: [{ type: 'card' }, { type: 'fixed', cardName: { $nin: ['', null] } }]
       }).select('amount cardName month type description category').lean()
     ]);
+    return { startDay, currentCompetence: getCompetenceMonth(new Date(), startDay), cards, transactions };
+  }
+
+  async getSummary(competence = null) {
+    const { startDay, currentCompetence, cards, transactions } = await this.loadContext();
+    const targetCompetence = competence || currentCompetence;
+    const targetKey = toCompetenceKey(targetCompetence);
+    const calendar = new InvoiceCalendar(startDay);
+    const today = new Date();
 
     const openByCard = this.groupByCard(transactions, t => this.isOpenAt(t, targetKey));
     const invoiceByCard = this.groupByCard(transactions, t => toCompetenceKey(t.month) === targetKey);
@@ -56,6 +59,31 @@ class CardLimitService {
       cards: cardSummaries,
       totals: this.buildTotals(cardSummaries),
       bestCardForToday: this.findBestCardForToday(cardSummaries)
+    };
+  }
+
+  // Committed limit per card from the current competence on, stopping once everything is released
+  async getProjection(maxMonths = 12) {
+    const { currentCompetence, cards, transactions } = await this.loadContext();
+    const months = [];
+
+    for (let offset = 0; offset < maxMonths; offset++) {
+      const competence = shiftCompetence(currentCompetence, offset);
+      const openByCard = this.groupByCard(transactions, t => this.isOpenAt(t, toCompetenceKey(competence)));
+      const byCard = Object.fromEntries(cards.map(card => [
+        card._id.toString(),
+        round(sumAmounts(openByCard.get(normalizeCardName(card.cardName))))
+      ]));
+      const total = round(Object.values(byCard).reduce((sum, value) => sum + value, 0));
+
+      months.push({ competence, total, byCard });
+      if (total === 0) break;
+    }
+
+    return {
+      cards: cards.map(card => ({ _id: card._id, cardName: card.cardName, limit: round(card.limit || 0) })),
+      totalLimit: round(cards.reduce((sum, card) => sum + (card.limit || 0), 0)),
+      months
     };
   }
 

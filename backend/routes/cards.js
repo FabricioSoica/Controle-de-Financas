@@ -43,6 +43,16 @@ router.get('/limits', async (req, res) => {
   }
 });
 
+// GET /api/cards/limits/projection - Committed limit per card over the next competences
+router.get('/limits/projection', async (req, res) => {
+  try {
+    const projection = await new CardLimitService(req.user.id).getProjection();
+    res.json(projection);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao calcular projeção dos limites: ' + error.message });
+  }
+});
+
 // POST /api/cards/config - Add or update a card configuration
 router.post('/config', async (req, res) => {
   try {
