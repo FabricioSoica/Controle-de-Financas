@@ -32,6 +32,7 @@ const configLoading = ref(false);
 const competenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
 const tempCompetenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
 const settingsLoaded = ref(false);
+const settingsVersion = ref(0);
 
 const showToast = (message, type = 'success') => {
   const id = Date.now();
@@ -188,6 +189,8 @@ watch(showSettingsModal, (isOpen) => {
   if (isOpen) {
     fetchCardConfigs();
     tempCompetenceStartDay.value = competenceStartDay.value;
+  } else {
+    settingsVersion.value++;
   }
 });
 
@@ -329,9 +332,11 @@ const handleUnauthorized = () => {
       />
 
       <CardsTab 
-        v-if="activeTab === 'cards'" 
+        v-if="activeTab === 'cards' && settingsLoaded" 
         :token="token"
         :apiUrl="API_URL"
+        :competenceStartDay="competenceStartDay"
+        :settingsVersion="settingsVersion"
         @toast="handleToast"
         @open-settings="showSettingsModal = true"
       />

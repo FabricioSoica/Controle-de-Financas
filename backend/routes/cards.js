@@ -28,10 +28,15 @@ router.get('/config', async (req, res) => {
   }
 });
 
-// GET /api/cards/limits - Limit, used and available amount of each card
+// GET /api/cards/limits?month=MM-YYYY - Limit, used and available amount of each card at a competence
 router.get('/limits', async (req, res) => {
   try {
-    const summary = await new CardLimitService(req.user.id).getSummary();
+    const competence = req.query.month ? req.query.month.replace(/[-_]/g, '/') : null;
+    if (competence && !/^(0[1-9]|1[0-2])\/\d{4}$/.test(competence)) {
+      return res.status(400).json({ error: 'Competência inválida. Use o formato MM-AAAA.' });
+    }
+
+    const summary = await new CardLimitService(req.user.id).getSummary(competence);
     res.json(summary);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao calcular limites dos cartões: ' + error.message });

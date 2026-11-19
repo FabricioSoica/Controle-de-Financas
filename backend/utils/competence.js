@@ -31,9 +31,16 @@ const toCompetenceKey = (month) => {
   return `${yearStr}-${monthStr}`;
 };
 
+const shiftCompetence = (month, delta) => {
+  const [monthStr, yearStr] = month.split('/');
+  const index = parseInt(yearStr, 10) * 12 + (parseInt(monthStr, 10) - 1) + delta;
+  return `${String((index % 12) + 1).padStart(2, '0')}/${Math.floor(index / 12)}`;
+};
+
 module.exports = {
   DEFAULT_COMPETENCE_START_DAY,
   getCompetenceStartDay,
   getCompetenceMonth,
-  toCompetenceKey
+  toCompetenceKey,
+  shiftCompetence
 };

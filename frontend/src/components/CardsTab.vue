@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { formatCurrency } from '../utils/format';
+import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 
 const props = defineProps({
   token: {
@@ -10,6 +11,14 @@ const props = defineProps({
   apiUrl: {
     type: String,
     required: true
+  },
+  competenceStartDay: {
+    type: Number,
+    default: DEFAULT_COMPETENCE_START_DAY
+  },
+  settingsVersion: {
+    type: Number,
+    default: 0
   }
 });
 
@@ -17,11 +26,32 @@ const emit = defineEmits(['toast', 'open-settings']);
 
 const summary = ref(null);
 const loading = ref(false);
+const currentMonth = getCompetenceYM(new Date(), props.competenceStartDay);
+const selectedMonth = ref(currentMonth);
+
+const formatMonthLabel = (ym) => {
+  const [year, month] = ym.split('-');
+  return `${month}/${year}`;
+};
+
+const changeMonth = (delta) => {
+  const [year, month] = selectedMonth.value.split('-').map(Number);
+  const date = new Date(year, month - 1 + delta, 1);
+  selectedMonth.value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const periodView = computed(() => {
+  if (selectedMonth.value < currentMonth) return { label: 'Retrospectiva', icon: 'fa-clock-rotate-left', className: 'past' };
+  if (selectedMonth.value > currentMonth) return { label: 'Projeção', icon: 'fa-chart-line', className: 'future' };
+  return { label: 'Atual', icon: 'fa-location-dot', className: 'current' };
+});
 
 const fetchLimits = async () => {
+  if (!selectedMonth.value) return;
   loading.value = true;
   try {
-    const res = await fetch(`${props.apiUrl}/api/cards/limits`, {
+    const [year, month] = selectedMonth.value.split('-');
+    const res = await fetch(`${props.apiUrl}/api/cards/limits?month=${month}-${year}`, {
       headers: { 'Authorization': `Bearer ${props.token}` }
     });
     if (!res.ok) throw new Error('Falha ao buscar limites dos cartões');
@@ -42,11 +72,38 @@ const usageLevel = (percent) => {
 
 const barWidth = (percent) => `${Math.min(Math.max(percent || 0, 0), 100)}%`;
 
+watch(selectedMonth, fetchLimits);
+watch(() => props.settingsVersion, fetchLimits);
 onMounted(fetchLimits);
 </script>
 
 <template>
   <div>
+    <div class="filter-bar">
+      <div class="month-picker-container">
+        <span class="month-picker-label"><i class="fa-solid fa-calendar-days"></i> Competência:</span>
+        <div class="month-nav-group">
+          <button type="button" class="btn-nav-month" @click="changeMonth(-1)" title="Mês Anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <input type="month" v-model="selectedMonth" class="month-input" />
+          <button type="button" class="btn-nav-month" @click="changeMonth(1)" title="Mês Seguinte">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+        <button type="button" class="btn-today" @click="selectedMonth = currentMonth">Mês Atual</button>
+      </div>
+
+      <div class="filter-actions">
+        <span class="period-badge" :class="periodView.className">
+          <i class="fa-solid" :class="periodView.icon"></i> {{ periodView.label }}
+        </span>
+        <button type="button" class="btn-today" @click="emit('open-settings')">
+          <i class="fa-solid fa-gear"></i> Configurar Cartões
+        </button>
+      </div>
+    </div>
+
     <div v-if="loading && !summary" class="empty-state">
       <i class="fa-solid fa-spinner fa-spin"></i> Carregando limites...
     </div>
@@ -125,13 +182,65 @@ onMounted(fetchLimits);
       </div>
 
       <p class="limits-footnote">
-        Em uso = compras no cartão da competência {{ summary.competence }} em diante (incluindo parcelas futuras) e assinaturas fixas do mês atual.
+        <template v-if="periodView.className === 'future'">
+          Projeção para {{ formatMonthLabel(selectedMonth) }}: parcelas já lançadas que ainda estarão em aberto e assinaturas fixas do mês. Compras novas não entram até serem lançadas.
+        </template>
+        <template v-else>
+          Em uso em {{ formatMonthLabel(selectedMonth) }}: compras feitas até essa competência com parcelas ainda em aberto (incluindo as futuras) e assinaturas fixas do mês.
+        </template>
       </p>
     </template>
   </div>
 </template>
 
 <style scoped>
+.filter-bar {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.month-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.period-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.period-badge.past {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.period-badge.current {
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.period-badge.future {
+  color: var(--color-primary);
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.08);
+}
+
 .limits-total::before { background-color: var(--color-primary); }
 .limits-available::before { background-color: var(--color-success); }
 .limits-used::before { background-color: var(--color-danger); }
@@ -252,6 +361,14 @@ onMounted(fetchLimits);
   margin-top: 1rem;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .filter-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 480px) {

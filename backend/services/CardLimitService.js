@@ -1,6 +1,13 @@
 const CreditCard = require('../models/CreditCard');
 const Transaction = require('../models/Transaction');
-const { getCompetenceStartDay, getCompetenceMonth, toCompetenceKey } = require('../utils/competence');
+const {
+  getCompetenceStartDay,
+  getCompetenceMonth,
+  toCompetenceKey,
+  shiftCompetence
+} = require('../utils/competence');
+
+const INSTALLMENT_SUFFIX = /\((\d+)\/\d+\)\s*$/;
 
 const round = (value) => parseFloat(value.toFixed(2));
 const normalizeCardName = (name) => (name || '').trim().toLowerCase();
@@ -10,36 +17,40 @@ class CardLimitService {
     this.userId = userId;
   }
 
-  async getSummary(referenceDate = new Date()) {
+  async getSummary(competence = null) {
     const startDay = await getCompetenceStartDay(this.userId);
-    const currentKey = toCompetenceKey(getCompetenceMonth(referenceDate, startDay));
+    const currentCompetence = getCompetenceMonth(new Date(), startDay);
+    const targetCompetence = competence || currentCompetence;
 
     const [cards, transactions] = await Promise.all([
       CreditCard.find({ userId: this.userId }).sort({ cardName: 1 }).lean(),
       Transaction.find({
         userId: this.userId,
         $or: [{ type: 'card' }, { type: 'fixed', cardName: { $nin: ['', null] } }]
-      }).select('amount cardName month type').lean()
+      }).select('amount cardName month type description').lean()
     ]);
 
-    const usedByCard = this.sumOpenAmountsByCard(transactions, currentKey);
+    const usedByCard = this.sumOpenAmountsByCard(transactions, toCompetenceKey(targetCompetence));
     const cardSummaries = cards.map(card => this.buildCardSummary(card, usedByCard.get(normalizeCardName(card.cardName)) || 0));
 
     return {
-      competence: getCompetenceMonth(referenceDate, startDay),
+      competence: targetCompetence,
+      currentCompetence,
       cards: cardSummaries,
       totals: this.buildTotals(cardSummaries)
     };
   }
 
-  // Installments occupy the limit until their invoice is paid, so every card purchase from the
-  // current competence on counts; fixed subscriptions only take limit once charged (current competence)
-  sumOpenAmountsByCard(transactions, currentKey) {
+  // Position of the limit at the given competence: purchases made up to it whose installments are
+  // still unpaid (its own invoice onwards), plus fixed subscriptions charged in it
+  sumOpenAmountsByCard(transactions, targetKey) {
     const usedByCard = new Map();
 
     for (const t of transactions) {
       const key = toCompetenceKey(t.month);
-      const isOpen = t.type === 'card' ? key >= currentKey : key === currentKey;
+      const isOpen = t.type === 'card'
+        ? key >= targetKey && this.getPurchaseCompetenceKey(t) <= targetKey
+        : key === targetKey;
       if (!isOpen) continue;
 
       const cardKey = normalizeCardName(t.cardName);
@@ -47,6 +58,13 @@ class CardLimitService {
     }
 
     return usedByCard;
+  }
+
+  // Installment "Notebook (09/18)" in 11/2026 was bought 8 competences earlier, in 03/2026
+  getPurchaseCompetenceKey(transaction) {
+    const match = INSTALLMENT_SUFFIX.exec(transaction.description || '');
+    const installmentNumber = match ? parseInt(match[1], 10) : 1;
+    return toCompetenceKey(shiftCompetence(transaction.month, -(installmentNumber - 1)));
   }
 
   buildCardSummary(card, used) {
