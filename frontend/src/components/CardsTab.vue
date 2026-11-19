@@ -5,6 +5,7 @@ import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competen
 import BaseModal from './BaseModal.vue';
 import CardLimitProjectionChart from './CardLimitProjectionChart.vue';
 import { getSeriesColor } from '../utils/chartPalette';
+import { getUsageLevel } from '../utils/cardUsage';
 
 const props = defineProps({
   token: {
@@ -102,13 +103,6 @@ const fetchLimits = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const usageLevel = (percent) => {
-  if (percent === null) return 'unknown';
-  if (percent >= 80) return 'high';
-  if (percent >= 50) return 'medium';
-  return 'low';
 };
 
 const barWidth = (percent) => `${Math.min(Math.max(percent || 0, 0), 100)}%`;
@@ -224,9 +218,9 @@ onMounted(refreshAll);
 
           <template v-if="card.limit > 0">
             <div class="limit-bar">
-              <div class="limit-bar-fill" :class="usageLevel(card.usagePercent)" :style="{ width: barWidth(card.usagePercent) }"></div>
+              <div class="limit-bar-fill" :class="getUsageLevel(card.usagePercent)" :style="{ width: barWidth(card.usagePercent) }"></div>
             </div>
-            <div class="limit-percent" :class="usageLevel(card.usagePercent)">{{ card.usagePercent.toFixed(1) }}% usado</div>
+            <div class="limit-percent" :class="getUsageLevel(card.usagePercent)">{{ card.usagePercent.toFixed(1) }}% usado</div>
 
             <div class="limit-values">
               <div>

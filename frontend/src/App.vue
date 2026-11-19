@@ -321,6 +321,7 @@ const handleUnauthorized = () => {
         :competenceStartDay="competenceStartDay"
         @toast="handleToast"
         @unauthorized="handleUnauthorized"
+        @navigate="activeTab = $event"
       />
 
       <!-- TAB 2: EVOLUTION SUMMARY -->

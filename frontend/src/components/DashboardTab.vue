@@ -2,6 +2,8 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import CategoriesTab from './CategoriesTab.vue';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
+import { getUsageLevel } from '../utils/cardUsage';
+import { formatCurrency as formatMoney } from '../utils/format';
 
 const props = defineProps({
   token: {
@@ -18,7 +20,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['toast', 'unauthorized']);
+const emit = defineEmits(['toast', 'unauthorized', 'navigate']);
 
 // Transactions and Filters State
 const transactions = ref([]);
@@ -324,6 +326,22 @@ const fetchBalance = async () => {
   }
 };
 
+const highUsageCards = ref([]);
+
+const fetchCardUsageAlerts = async () => {
+  try {
+    const res = await fetch(`${props.apiUrl}/api/cards/limits`, {
+      headers: getHeaders()
+    });
+    if (res.ok) {
+      const summary = await res.json();
+      highUsageCards.value = summary.cards.filter(card => getUsageLevel(card.usagePercent) === 'high');
+    }
+  } catch (error) {
+    console.error('Error fetching card usage alerts:', error);
+  }
+};
+
 const openBalanceEdit = () => {
   tempBalance.value = balanceInfo.value.configured ? balanceInfo.value.currentBalance : '';
   showBalanceEdit.value = true;
@@ -355,8 +373,9 @@ const saveBalance = async () => {
 
 const fetchTransactions = async () => {
   if (!props.token) return;
-  // Any change in transactions may change the account balance
+  // Any change in transactions may change the account balance and the cards usage
   fetchBalance();
+  fetchCardUsageAlerts();
   try {
     const formattedMonth = getMonthYearString(selectedMonth.value);
     const urlMonth = formattedMonth.replace('/', '-');
@@ -1240,6 +1259,17 @@ const donutSegments = computed(() => {
           Período: <strong style="color: var(--text-primary);">{{ getMonthYearString(selectedMonth) }}</strong>
         </span>
       </div>
+    </div>
+
+    <div v-if="highUsageCards.length > 0" class="card-usage-alert" role="alert">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <div class="card-usage-alert-text">
+        <strong>Limite alto:</strong>
+        <span v-for="(card, index) in highUsageCards" :key="card._id">
+          {{ card.cardName }} com {{ card.usagePercent.toFixed(0) }}% em uso ({{ formatMoney(card.available) }} livre){{ index < highUsageCards.length - 1 ? ';' : '.' }}
+        </span>
+      </div>
+      <button type="button" class="btn-today" @click="emit('navigate', 'cards')">Ver cartões</button>
     </div>
 
     <!-- Top KPI Grid -->
@@ -2269,6 +2299,35 @@ const donutSegments = computed(() => {
 </template>
 
 <style scoped>
+.card-usage-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(244, 63, 94, 0.08);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.card-usage-alert > i {
+  color: var(--color-danger);
+  font-size: 1.1rem;
+}
+
+.card-usage-alert-text {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.card-usage-alert .btn-today {
+  white-space: nowrap;
+}
+
 /* Account balance card */
 .balance-edit-form {
   display: flex;
