@@ -6,6 +6,7 @@ import DashboardTab from './components/DashboardTab.vue';
 import EvolutionTab from './components/EvolutionTab.vue';
 import ShoppingTab from './components/ShoppingTab.vue';
 import FuelTab from './components/FuelTab.vue';
+import CardsTab from './components/CardsTab.vue';
 
 const API_URL = import.meta.env.DEV ? 'http://localhost:5001' : '';
 
@@ -26,6 +27,7 @@ const cardConfigs = ref([]);
 const newCardName = ref('');
 const newCardClosingDay = ref('');
 const newCardDueDay = ref('');
+const newCardLimit = ref('');
 const configLoading = ref(false);
 const competenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
 const tempCompetenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
@@ -131,7 +133,8 @@ const saveCardConfig = async () => {
       body: JSON.stringify({
         cardName: newCardName.value.trim(),
         closingDay: closing,
-        dueDay: due
+        dueDay: due,
+        limit: newCardLimit.value === '' ? 0 : parseFloat(newCardLimit.value)
       })
     });
     
@@ -140,6 +143,7 @@ const saveCardConfig = async () => {
       newCardName.value = '';
       newCardClosingDay.value = '';
       newCardDueDay.value = '';
+      newCardLimit.value = '';
       fetchCardConfigs();
     } else {
       const err = await res.json();
@@ -176,6 +180,7 @@ const editCardConfig = (card) => {
   newCardName.value = card.cardName;
   newCardClosingDay.value = card.closingDay;
   newCardDueDay.value = card.dueDay;
+  newCardLimit.value = card.limit || '';
 };
 
 import { watch } from 'vue';
@@ -258,6 +263,14 @@ const handleUnauthorized = () => {
           </button>
           <button 
             class="tab-btn" 
+            :class="{ active: activeTab === 'cards' }" 
+            @click="activeTab = 'cards'"
+            type="button"
+          >
+            <i class="fa-solid fa-credit-card"></i> Cartões
+          </button>
+          <button 
+            class="tab-btn" 
             :class="{ active: activeTab === 'shopping' }" 
             @click="activeTab = 'shopping'"
             type="button"
@@ -313,6 +326,14 @@ const handleUnauthorized = () => {
         :token="token"
         :apiUrl="API_URL"
         @toast="handleToast"
+      />
+
+      <CardsTab 
+        v-if="activeTab === 'cards'" 
+        :token="token"
+        :apiUrl="API_URL"
+        @toast="handleToast"
+        @open-settings="showSettingsModal = true"
       />
 
       <!-- TAB 3: SHOPPING LIST -->
@@ -388,11 +409,11 @@ const handleUnauthorized = () => {
 
           <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem; color: var(--text-primary);">Cartões de Crédito</h4>
           <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.4;">
-            Dias de fechamento e vencimento de cada cartão, exibidos como referência ao lançar compras.
+            Fechamento, vencimento e limite de cada cartão. O limite é usado na aba Cartões.
           </p>
           
           <!-- Add Card Config Form -->
-          <form @submit.prevent="saveCardConfig" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 0.8fr; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem;">
+          <form @submit.prevent="saveCardConfig" style="display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr 1.1fr 0.8fr; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" style="font-size: 0.75rem;">Nome do Cartão</label>
               <input 
@@ -430,6 +451,18 @@ const handleUnauthorized = () => {
                 required
               />
             </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" style="font-size: 0.75rem;">Limite (R$)</label>
+              <input 
+                type="number" 
+                v-model="newCardLimit" 
+                placeholder="0,00" 
+                min="0" 
+                step="0.01" 
+                class="form-input" 
+                style="padding: 0.4rem 0.75rem; font-size: 0.85rem;"
+              />
+            </div>
             <button type="submit" class="btn btn-primary" :disabled="configLoading" style="padding: 0.45rem; font-size: 0.85rem; height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;">
               <i class="fa-solid fa-plus"></i> Salvar
             </button>
@@ -444,7 +477,7 @@ const handleUnauthorized = () => {
               <div v-for="c in cardConfigs" :key="c._id" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 0.85rem;">
                 <span style="font-weight: 600; color: var(--text-primary);"><i class="fa-solid fa-credit-card" style="color: var(--color-danger); opacity: 0.8; margin-right: 0.25rem;"></i> {{ c.cardName }}</span>
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                  <span style="color: var(--text-secondary); font-size: 0.75rem;">Fecha: <strong>{{ c.closingDay }}</strong> | Vence: <strong>{{ c.dueDay }}</strong></span>
+                  <span style="color: var(--text-secondary); font-size: 0.75rem;">Fecha: <strong>{{ c.closingDay }}</strong> | Vence: <strong>{{ c.dueDay }}</strong> | Limite: <strong>{{ c.limit ? c.limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—' }}</strong></span>
                   <div style="display: flex; gap: 0.25rem;">
                     <button @click="editCardConfig(c)" style="background: none; border: none; color: var(--color-primary); cursor: pointer; padding: 0.25rem;" title="Editar" type="button">
                       <i class="fa-solid fa-pen"></i>

@@ -23,6 +23,11 @@ const CreditCardSchema = new mongoose.Schema({
     required: true,
     min: 1,
     max: 31
+  },
+  limit: {
+    type: Number,
+    min: 0,
+    default: 0
   }
 }, {
   timestamps: true

@@ -25,8 +25,15 @@ const getCompetenceMonth = (dateInput, startDay = DEFAULT_COMPETENCE_START_DAY) 
   return `${String(month).padStart(2, '0')}/${year}`;
 };
 
+// 'MM/YYYY' -> 'YYYY-MM', so competences can be compared as strings
+const toCompetenceKey = (month) => {
+  const [monthStr, yearStr] = (month || '').split('/');
+  return `${yearStr}-${monthStr}`;
+};
+
 module.exports = {
   DEFAULT_COMPETENCE_START_DAY,
   getCompetenceStartDay,
-  getCompetenceMonth
+  getCompetenceMonth,
+  toCompetenceKey
 };

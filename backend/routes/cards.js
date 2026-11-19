@@ -1,5 +1,6 @@
 const express = require('express');
 const CreditCard = require('../models/CreditCard');
+const CardLimitService = require('../services/CardLimitService');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -27,10 +28,20 @@ router.get('/config', async (req, res) => {
   }
 });
 
+// GET /api/cards/limits - Limit, used and available amount of each card
+router.get('/limits', async (req, res) => {
+  try {
+    const summary = await new CardLimitService(req.user.id).getSummary();
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao calcular limites dos cartões: ' + error.message });
+  }
+});
+
 // POST /api/cards/config - Add or update a card configuration
 router.post('/config', async (req, res) => {
   try {
-    const { cardName, closingDay, dueDay } = req.body;
+    const { cardName, closingDay, dueDay, limit } = req.body;
     
     if (!cardName || closingDay === undefined || dueDay === undefined) {
       return res.status(400).json({ error: 'Campos obrigatórios ausentes: nome do cartão, dia de fechamento e dia de vencimento são obrigatórios.' });
@@ -45,13 +56,18 @@ router.post('/config', async (req, res) => {
     if (isNaN(due) || due < 1 || due > 31) {
       return res.status(400).json({ error: 'O dia de vencimento deve ser um número inteiro de 1 a 31.' });
     }
+
+    const cardLimit = limit === undefined || limit === '' ? 0 : parseFloat(limit);
+    if (isNaN(cardLimit) || cardLimit < 0) {
+      return res.status(400).json({ error: 'O limite do cartão deve ser um valor maior ou igual a zero.' });
+    }
     
     const normalizedCardName = cardName.trim();
     
     // Upsert the card configuration
     const config = await CreditCard.findOneAndUpdate(
       { userId: req.user.id, cardName: normalizedCardName },
-      { $set: { closingDay: closing, dueDay: due } },
+      { $set: { closingDay: closing, dueDay: due, limit: cardLimit } },
       { new: true, upsert: true, runValidators: true }
     );
     
