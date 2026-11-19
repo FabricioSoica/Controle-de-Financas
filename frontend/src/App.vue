@@ -33,6 +33,12 @@ const competenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
 const tempCompetenceStartDay = ref(DEFAULT_COMPETENCE_START_DAY);
 const settingsLoaded = ref(false);
 const settingsVersion = ref(0);
+const fuelEditRequest = ref(null);
+
+const handleNavigate = (tab, options = {}) => {
+  fuelEditRequest.value = options.editRefillId ? { refillId: options.editRefillId } : null;
+  activeTab.value = tab;
+};
 
 const showToast = (message, type = 'success') => {
   const id = Date.now();
@@ -321,7 +327,7 @@ const handleUnauthorized = () => {
         :competenceStartDay="competenceStartDay"
         @toast="handleToast"
         @unauthorized="handleUnauthorized"
-        @navigate="activeTab = $event"
+        @navigate="handleNavigate"
       />
 
       <!-- TAB 2: EVOLUTION SUMMARY -->
@@ -357,6 +363,8 @@ const handleUnauthorized = () => {
         :token="token"
         :apiUrl="API_URL"
         :competenceStartDay="competenceStartDay"
+        :editRequest="fuelEditRequest"
+        @edit-request-handled="fuelEditRequest = null"
         @toast="handleToast"
       />
 

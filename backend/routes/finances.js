@@ -3,8 +3,19 @@ const Transaction = require('../models/Transaction');
 const MonthlyGoal = require('../models/MonthlyGoal');
 const CategoryConfig = require('../models/CategoryConfig');
 const authMiddleware = require('../middleware/auth');
+const FuelRefillService = require('../services/FuelRefillService');
 
 const router = express.Router();
+
+const FUEL_LOCKED_FIELDS = ['description', 'amount', 'type', 'cardName', 'month', 'info', 'installments'];
+
+// Fuel transactions are owned by their refill; only the category can be changed from here
+const changesFuelLockedFields = (transaction, body) => FUEL_LOCKED_FIELDS.some(field => {
+  if (body[field] === undefined) return false;
+  if (field === 'installments') return parseInt(body[field], 10) > 1;
+  if (field === 'amount') return parseFloat(body[field]) !== transaction.amount;
+  return String(body[field]).trim() !== String(transaction[field] || '').trim();
+});
 
 // Apply authMiddleware to all finance routes
 router.use(authMiddleware);
@@ -355,6 +366,10 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Lançamento não encontrado ou sem permissão.' });
     }
 
+    if (originalTrans.fuelRefillId && changesFuelLockedFields(originalTrans, req.body)) {
+      return res.status(409).json({ error: 'Este lançamento pertence a um abastecimento. Edite pela aba Gasolina.' });
+    }
+
     const monthFormatted = (month || originalTrans.month).replace(/[-_]/g, '/');
     const targetType = type || originalTrans.type;
 
@@ -465,10 +480,22 @@ router.put('/:id', async (req, res) => {
 // Delete a transaction
 router.delete('/:id', async (req, res) => {
   try {
-    const { deleteAll } = req.query;
+    const { deleteAll, refill } = req.query;
     const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
     if (!transaction) {
       return res.status(404).json({ error: 'Lançamento não encontrado.' });
+    }
+
+    if (transaction.fuelRefillId) {
+      const fuelService = new FuelRefillService(req.user.id);
+      const ownerRefill = await fuelService.findByTransactionId(transaction._id);
+      if (ownerRefill && refill === 'delete') {
+        await fuelService.delete(ownerRefill._id);
+      } else {
+        await fuelService.detachTransaction(transaction._id);
+        await Transaction.deleteOne({ _id: transaction._id });
+      }
+      return res.json({ message: 'Lançamento deletado com sucesso.', id: req.params.id });
     }
 
     // Se for compra parcelada no cartão E o usuário escolheu apagar todas (deleteAll === 'true')

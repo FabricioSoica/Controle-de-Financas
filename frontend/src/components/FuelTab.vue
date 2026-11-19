@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick } from 'vue';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 import { useFuelPriceCalculator } from '../composables/useFuelPriceCalculator';
 
@@ -15,10 +15,14 @@ const props = defineProps({
   competenceStartDay: {
     type: Number,
     default: DEFAULT_COMPETENCE_START_DAY
+  },
+  editRequest: {
+    type: Object,
+    default: null
   }
 });
 
-const emit = defineEmits(['toast']);
+const emit = defineEmits(['toast', 'edit-request-handled']);
 
 // State
 const refills = ref([]);
@@ -121,10 +125,24 @@ onMounted(() => {
   refillDate.value = `${year}-${month}-${day}`;
   goToCurrentCompetence();
   
-  fetchRefills();
+  fetchRefills().then(openRequestedEdit);
   fetchSummary();
   fetchConfiguredCards();
 });
+
+const openRequestedEdit = async () => {
+  if (!props.editRequest) return;
+  const refill = refills.value.find(r => r._id === props.editRequest.refillId);
+  if (refill) {
+    const [month, year] = refill.month.split('/');
+    selectedMonth.value = `${year}-${month}`;
+    await nextTick();
+    editRefill(refill);
+  } else {
+    emit('toast', { message: 'Abastecimento não encontrado.', type: 'error' });
+  }
+  emit('edit-request-handled');
+};
 
 // Calculations for stats
 const currentMonthLabel = computed(() => getMonthYearString(selectedMonth.value));

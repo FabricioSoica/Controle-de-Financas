@@ -462,6 +462,10 @@ const saveTransaction = async () => {
   }
 };
 const editTransaction = (t) => {
+  if (t.fuelRefillId) {
+    emit('navigate', 'fuel', { editRefillId: t.fuelRefillId });
+    return;
+  }
   isPopulatingEdit = true;
   transId.value = t._id;
   transDesc.value = t.description;
@@ -582,9 +586,11 @@ const handleDeleteFromModal = (t) => {
 const showDeleteModal = ref(false);
 const transactionToDelete = ref(null);
 
+const isFuelToDelete = computed(() => Boolean(transactionToDelete.value && transactionToDelete.value.fuelRefillId));
+
 const isInstallmentToDelete = computed(() => {
   const t = transactionToDelete.value;
-  return t && t.type === 'card' && t.description.includes(' (');
+  return t && !t.fuelRefillId && t.type === 'card' && t.description.includes(' (');
 });
 
 const deleteTransaction = (t) => {
@@ -592,19 +598,20 @@ const deleteTransaction = (t) => {
   showDeleteModal.value = true;
 };
 
-const executeDelete = async (id, deleteAll) => {
+const executeDelete = async (id, deleteAll, refillAction = 'keep') => {
   try {
-    const res = await fetch(`${props.apiUrl}/api/finances/${id}?deleteAll=${deleteAll}`, {
+    const res = await fetch(`${props.apiUrl}/api/finances/${id}?deleteAll=${deleteAll}&refill=${refillAction}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
     if (!res.ok) throw new Error('Erro ao deletar lançamento');
-    emit('toast', { 
-      message: deleteAll 
-        ? 'Todas as parcelas foram excluídas com sucesso.' 
-        : 'Lançamento excluído com sucesso.', 
-      type: 'success' 
-    });
+    const successMessages = {
+      installments: 'Todas as parcelas foram excluídas com sucesso.',
+      refill: 'Lançamento e abastecimento excluídos com sucesso.',
+      single: 'Lançamento excluído com sucesso.'
+    };
+    const messageKey = deleteAll ? 'installments' : (refillAction === 'delete' ? 'refill' : 'single');
+    emit('toast', { message: successMessages[messageKey], type: 'success' });
     fetchTransactions();
     fetchAnnualEvolution();
     fetchDbCategories();
@@ -613,9 +620,9 @@ const executeDelete = async (id, deleteAll) => {
   }
 };
 
-const confirmDelete = (deleteAll) => {
+const confirmDelete = (deleteAll, refillAction = 'keep') => {
   if (transactionToDelete.value) {
-    executeDelete(transactionToDelete.value._id, deleteAll);
+    executeDelete(transactionToDelete.value._id, deleteAll, refillAction);
   }
   closeDeleteModal();
 };
@@ -754,7 +761,7 @@ const openImportModal = async () => {
     const prevTransactions = await res.json();
     
     // Filter out credit card installments (which are already automatically created for subsequent months)
-    const importableTransactions = prevTransactions.filter(t => !(t.type === 'card' && t.description.includes(' (')));
+    const importableTransactions = prevTransactions.filter(t => !t.fuelRefillId && !(t.type === 'card' && t.description.includes(' (')));
     
     if (importableTransactions.length === 0) {
       emit('toast', { message: 'Nenhum lançamento importável encontrado no mês anterior.', type: 'info' });
@@ -1429,6 +1436,7 @@ const donutSegments = computed(() => {
                 <div style="display: flex; flex-direction: column; gap: 0.1rem;">
                   <span class="cc-detail-desc">
                     {{ item.description }}
+                    <span v-if="item.fuelRefillId" class="fuel-badge" title="Lançamento de abastecimento"><i class="fa-solid fa-gas-pump"></i></span>
                     <span v-if="item.isSubscription" class="subscription-badge" style="font-size: 0.6rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.08); padding: 0.05rem 0.25rem; border-radius: 3px; margin-left: 0.25rem;">
                       Fixo
                     </span>
@@ -1838,7 +1846,7 @@ const donutSegments = computed(() => {
               <div class="transaction-list-items">
                 <div v-for="t in transCards" :key="t._id" class="transaction-item">
                   <div class="item-main-row">
-                    <span class="item-desc">{{ t.description }}</span>
+                    <span class="item-desc">{{ t.description }} <span v-if="t.fuelRefillId" class="fuel-badge" title="Lançamento de abastecimento: edite pela aba Gasolina"><i class="fa-solid fa-gas-pump"></i></span></span>
                     <span class="item-val text-danger">{{ formatCurrency(t.amount) }}</span>
                   </div>
                   <div class="item-details-row" style="margin-top: 0.15rem;">
@@ -1920,7 +1928,7 @@ const donutSegments = computed(() => {
               <div class="transaction-list-items">
                 <div v-for="t in transCashs" :key="t._id" class="transaction-item">
                   <div class="item-main-row">
-                    <span class="item-desc">{{ t.description }}</span>
+                    <span class="item-desc">{{ t.description }} <span v-if="t.fuelRefillId" class="fuel-badge" title="Lançamento de abastecimento: edite pela aba Gasolina"><i class="fa-solid fa-gas-pump"></i></span></span>
                     <span class="item-val text-cash">{{ formatCurrency(t.amount) }}</span>
                   </div>
                   <div class="item-details-row">
@@ -1990,7 +1998,7 @@ const donutSegments = computed(() => {
         <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
           <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem; color: var(--text-primary);">
             <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-danger);"></i>
-            {{ isInstallmentToDelete ? 'Excluir Compra Parcelada' : 'Excluir Lançamento' }}
+            {{ isFuelToDelete ? 'Excluir Lançamento de Abastecimento' : (isInstallmentToDelete ? 'Excluir Compra Parcelada' : 'Excluir Lançamento') }}
           </h3>
           <button @click="closeDeleteModal" class="btn-close-modal" type="button" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; transition: var(--transition-smooth); padding: 0.25rem;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
             <i class="fa-solid fa-xmark"></i>
@@ -2020,11 +2028,25 @@ const donutSegments = computed(() => {
           <p v-if="isInstallmentToDelete" style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
             Como você deseja excluir esta compra?
           </p>
+          <p v-if="isFuelToDelete" style="font-size: 0.85rem; color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">
+            Este lançamento veio de um abastecimento. Deseja apagar o abastecimento também?
+          </p>
         </div>
         
         <div class="modal-footer" style="display: flex; flex-direction: column; gap: 0.65rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <template v-if="isFuelToDelete">
+            <button @click="confirmDelete(false, 'delete')" class="btn btn-danger" type="button" style="min-height: 42px; width: 100%; justify-content: center;">
+              <i class="fa-solid fa-gas-pump" style="margin-right: 0.5rem;"></i>
+              Apagar lançamento e abastecimento
+            </button>
+            <button @click="confirmDelete(false, 'keep')" class="btn btn-secondary" type="button" style="min-height: 42px; width: 100%; justify-content: center; background: rgba(255,255,255,0.03); border-color: var(--border-color); color: #fff;">
+              <i class="fa-solid fa-receipt" style="margin-right: 0.5rem; color: var(--color-primary);"></i>
+              Apagar só o lançamento (abastecimento fica no histórico)
+            </button>
+          </template>
+
           <!-- Opções de parcelamento -->
-          <template v-if="isInstallmentToDelete">
+          <template v-else-if="isInstallmentToDelete">
             <button @click="confirmDelete(false)" class="btn btn-secondary" type="button" style="min-height: 42px; width: 100%; justify-content: center; background: rgba(255,255,255,0.03); border-color: var(--border-color); color: #fff;">
               <i class="fa-solid fa-calendar-minus" style="margin-right: 0.5rem; color: var(--color-primary);"></i>
               Excluir Apenas do Mês Atual
@@ -2299,6 +2321,18 @@ const donutSegments = computed(() => {
 </template>
 
 <style scoped>
+.fuel-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.12);
+  vertical-align: middle;
+}
+
 .card-usage-alert {
   display: flex;
   align-items: center;
