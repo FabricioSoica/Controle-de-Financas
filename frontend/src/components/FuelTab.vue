@@ -35,6 +35,7 @@ const refillTotalAmount = ref('');
 const refillInfo = ref('');
 const refillPaymentType = ref('money'); // money, card
 const refillCardName = ref('');
+const refillRegisterInFinances = ref(true);
 const isEditing = ref(false);
 const submitLoading = ref(false);
 const fetchLoading = ref(false);
@@ -223,7 +224,8 @@ const saveRefill = async () => {
     totalAmount: parseFloat(refillTotalAmount.value),
     paymentType: refillPaymentType.value,
     cardName: refillPaymentType.value === 'card' ? refillCardName.value.trim() : '',
-    info: refillInfo.value
+    info: refillInfo.value,
+    registerInFinances: refillRegisterInFinances.value
   };
   
   submitLoading.value = true;
@@ -291,6 +293,7 @@ const editRefill = (r) => {
   refillPaymentType.value = r.paymentType || 'money';
   refillCardName.value = r.cardName || '';
   refillInfo.value = r.info || '';
+  refillRegisterInFinances.value = r.registerInFinances !== false;
   isEditing.value = true;
   scrollToForm();
 };
@@ -325,6 +328,7 @@ const resetForm = () => {
   refillPaymentType.value = 'money';
   refillCardName.value = '';
   refillInfo.value = '';
+  refillRegisterInFinances.value = true;
   isEditing.value = false;
 };
 
@@ -490,7 +494,7 @@ const formatDate = (dateStr) => {
             <div class="form-group">
               <label class="form-label" style="min-height: 34px; display: flex; align-items: flex-end;">Forma de Pagamento</label>
               <select v-model="refillPaymentType" class="form-select">
-                <option value="money">Dinheiro / Outro</option>
+                <option value="money">Dinheiro / Débito</option>
                 <option value="card">Cartão de Crédito</option>
               </select>
             </div>
@@ -521,6 +525,11 @@ const formatDate = (dateStr) => {
               class="form-input"
             />
           </div>
+
+          <label class="form-check">
+            <input type="checkbox" v-model="refillRegisterInFinances" />
+            <span>Registrar nas finanças <small>(cria o lançamento no Painel)</small></span>
+          </label>
 
           <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
             <button type="submit" class="btn btn-primary" :disabled="submitLoading" style="flex: 1;">
@@ -598,6 +607,7 @@ const formatDate = (dateStr) => {
                     <span v-else class="payment-badge-cash">
                       💵 Dinheiro
                     </span>
+                    <span v-if="r.registerInFinances === false" class="no-finance-badge" title="Este abastecimento não gera lançamento nas finanças">sem lançamento</span>
                   </td>
                   <td>
                     <span v-if="r.kmPerLiter > 0" class="consumption-badge">{{ r.kmPerLiter.toFixed(2) }} km/l</span>
@@ -646,6 +656,7 @@ const formatDate = (dateStr) => {
                     <span class="detail-value">
                       <span v-if="r.paymentType === 'card'" style="color: var(--color-danger); font-weight: 600;">💳 {{ r.cardName }}</span>
                       <span v-else style="color: var(--color-success); font-weight: 600;">💵 Dinheiro</span>
+                      <span v-if="r.registerInFinances === false" class="no-finance-badge">sem lançamento</span>
                     </span>
                   </div>
                   <div style="grid-column: span 2;">
@@ -784,6 +795,35 @@ const formatDate = (dateStr) => {
   font-weight: 600;
   font-size: 0.75rem;
   display: inline-block;
+}
+
+.no-finance-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+}
+
+.form-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.form-check input {
+  margin-top: 0.2rem;
+  accent-color: var(--color-primary);
+}
+
+.form-check small {
+  color: var(--text-secondary);
 }
 
 .payment-badge-cash {

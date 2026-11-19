@@ -4,7 +4,8 @@ const ShoppingItem = require('../models/ShoppingItem');
 const User = require('../models/User');
 const CreditCard = require('../models/CreditCard');
 const FuelRefill = require('../models/FuelRefill');
-const { getCompetenceStartDay, getCompetenceMonth } = require('../utils/competence');
+const MigrationRunner = require('../migrations/MigrationRunner');
+const migrations = require('../migrations');
 
 const migrateOrphans = async () => {
   try {
@@ -242,9 +243,8 @@ const migrateCategories = async () => {
   }
 };
 
-const migrateFuelAndCategories = async () => {
+const consolidateFuelCategories = async () => {
   try {
-    // 1. Convert all 'Combustível' and 'Gasolina' transaction categories to 'Transporte'
     const catResult = await Transaction.updateMany(
       { category: { $in: ['Combustível', 'Gasolina'] } },
       { $set: { category: 'Transporte' } }
@@ -252,54 +252,8 @@ const migrateFuelAndCategories = async () => {
     if (catResult.modifiedCount > 0) {
       console.log(`[Migration] Updated ${catResult.modifiedCount} transactions from Combustível/Gasolina to Transporte.`);
     }
-
-    // 2. Sync all FuelRefills with their Transactions using the user's competence rule
-    const refills = await FuelRefill.find();
-    const startDayByUser = new Map();
-
-    let syncedCount = 0;
-    for (const r of refills) {
-      const userKey = r.userId.toString();
-      if (!startDayByUser.has(userKey)) {
-        startDayByUser.set(userKey, await getCompetenceStartDay(r.userId));
-      }
-      const expectedMonth = getCompetenceMonth(r.date, startDayByUser.get(userKey));
-      const isCard = r.paymentType === 'card' && r.cardName && r.cardName.trim();
-
-      const transPayload = {
-        userId: r.userId,
-        description: `Gasolina - ${r.info ? r.info.trim() : 'Abastecimento'}`,
-        amount: r.totalAmount,
-        type: isCard ? 'card' : 'cash',
-        cardName: isCard ? r.cardName.trim() : '',
-        month: expectedMonth,
-        info: `Abastecimento de ${r.liters ? r.liters.toFixed(1) : 0}L (Odômetro: ${r.odometer ? r.odometer.toLocaleString('pt-BR') : 0} km)`,
-        category: 'Transporte'
-      };
-
-      if (r.transactionId) {
-        // Keep linked transaction in sync; if the user deleted it, do not recreate it
-        await Transaction.updateOne(
-          { _id: r.transactionId, userId: r.userId },
-          { $set: transPayload }
-        );
-      } else {
-        const savedTrans = await new Transaction(transPayload).save();
-        r.transactionId = savedTrans._id;
-      }
-
-      if (r.month !== expectedMonth || r.isModified('transactionId')) {
-        r.month = expectedMonth;
-        await r.save();
-      }
-      syncedCount++;
-    }
-
-    if (syncedCount > 0) {
-      console.log(`[Migration] Processed and synced ${syncedCount} fuel refills with transactions.`);
-    }
   } catch (err) {
-    console.error('[Migration] Error in migrateFuelAndCategories:', err);
+    console.error('[Migration] Error consolidating fuel categories:', err);
   }
 };
 
@@ -319,8 +273,8 @@ const connectDB = async () => {
     await migrateCreditCards();
     // Run DB migrations for categories
     await migrateCategories();
-    // Run DB migrations for fuel & category consolidation
-    await migrateFuelAndCategories();
+    await consolidateFuelCategories();
+    await new MigrationRunner().run(migrations);
   } catch (err) {
     console.error('MongoDB connection error:', err);
     process.exit(1);
@@ -331,6 +285,5 @@ module.exports = {
   connectDB,
   migrateOrphans,
   migrateCreditCards,
-  migrateCategories,
-  migrateFuelAndCategories
+  migrateCategories
 };

@@ -48,6 +48,10 @@ const FuelRefillSchema = new mongoose.Schema({
     ref: 'Transaction',
     default: null
   },
+  registerInFinances: {
+    type: Boolean,
+    default: true
+  },
   info: {
     type: String,
     trim: true,

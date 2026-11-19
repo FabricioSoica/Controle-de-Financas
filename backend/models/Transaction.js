@@ -41,6 +41,13 @@ const TransactionSchema = new mongoose.Schema({
     required: true,
     default: 'Outros',
     trim: true
+  },
+  // Set when the transaction is owned by a fuel refill, which is its source of truth
+  fuelRefillId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FuelRefill',
+    default: null,
+    index: true
   }
 }, {
   timestamps: true
