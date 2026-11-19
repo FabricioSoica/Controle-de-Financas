@@ -52,6 +52,10 @@ const FuelRefillSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  fullTank: {
+    type: Boolean,
+    default: false
+  },
   info: {
     type: String,
     trim: true,

@@ -21,7 +21,7 @@ const emit = defineEmits(['toast']);
 
 // State
 const refills = ref([]);
-const summary = ref([]);
+const summary = ref({ months: [], overall: null });
 const selectedMonth = ref('');
 const configuredCards = ref([]);
 
@@ -36,6 +36,7 @@ const refillInfo = ref('');
 const refillPaymentType = ref('money'); // money, card
 const refillCardName = ref('');
 const refillRegisterInFinances = ref(true);
+const refillFullTank = ref(false);
 const isEditing = ref(false);
 const submitLoading = ref(false);
 const fetchLoading = ref(false);
@@ -177,33 +178,15 @@ const totalLitersCurrentMonth = computed(() => {
   return currentMonthRefills.value.reduce((sum, r) => sum + r.liters, 0);
 });
 
-const totalDistanceCurrentMonth = computed(() => {
-  return currentMonthRefills.value.reduce((sum, r) => sum + r.distanceTraveled, 0);
-});
+const currentMonthSummary = computed(() => summary.value.months.find(m => m.monthLabel === currentMonthLabel.value) || null);
 
-const averageConsumptionCurrentMonth = computed(() => {
-  const validRefills = currentMonthRefills.value.filter(r => r.kmPerLiter > 0);
-  if (validRefills.length === 0) return 0;
-  const sumKmPerL = validRefills.reduce((sum, r) => sum + r.kmPerLiter, 0);
-  return parseFloat((sumKmPerL / validRefills.length).toFixed(2));
-});
+const averageConsumptionCurrentMonth = computed(() => currentMonthSummary.value ? currentMonthSummary.value.avgKmPerLiter : null);
 
-// Total distance over all time
-const totalDistanceAllTime = computed(() => {
-  if (refills.value.length < 2) return 0;
-  const latest = refills.value[0];
-  const oldest = refills.value[refills.value.length - 1];
-  const dist = latest.odometer - oldest.odometer;
-  return dist >= 0 ? dist : 0;
-});
+const averageConsumptionAllTime = computed(() => summary.value.overall ? summary.value.overall.avgKmPerLiter : null);
 
-// Average consumption over all time
-const averageConsumptionAllTime = computed(() => {
-  const validRefills = refills.value.filter(r => r.kmPerLiter > 0);
-  if (validRefills.length === 0) return 0;
-  const sumKmPerL = validRefills.reduce((sum, r) => sum + r.kmPerLiter, 0);
-  return parseFloat((sumKmPerL / validRefills.length).toFixed(2));
-});
+const totalDistanceAllTime = computed(() => summary.value.overall ? summary.value.overall.totalDistance : 0);
+
+const formatKmPerLiter = (value) => (value === null || value === undefined ? '—' : value.toFixed(2));
 
 const saveRefill = async () => {
   if (!refillDate.value || !refillOdometer.value || !refillLiters.value || !refillPricePerLiter.value || !refillTotalAmount.value) {
@@ -225,7 +208,8 @@ const saveRefill = async () => {
     paymentType: refillPaymentType.value,
     cardName: refillPaymentType.value === 'card' ? refillCardName.value.trim() : '',
     info: refillInfo.value,
-    registerInFinances: refillRegisterInFinances.value
+    registerInFinances: refillRegisterInFinances.value,
+    fullTank: refillFullTank.value
   };
   
   submitLoading.value = true;
@@ -294,6 +278,7 @@ const editRefill = (r) => {
   refillCardName.value = r.cardName || '';
   refillInfo.value = r.info || '';
   refillRegisterInFinances.value = r.registerInFinances !== false;
+  refillFullTank.value = Boolean(r.fullTank);
   isEditing.value = true;
   scrollToForm();
 };
@@ -329,6 +314,7 @@ const resetForm = () => {
   refillCardName.value = '';
   refillInfo.value = '';
   refillRegisterInFinances.value = true;
+  refillFullTank.value = false;
   isEditing.value = false;
 };
 
@@ -395,8 +381,8 @@ const formatDate = (dateStr) => {
       <div class="summary-card card-fuel-consumption">
         <span class="card-icon"><i class="fa-solid fa-gauge-high"></i></span>
         <div class="card-title">Consumo Médio (Mês)</div>
-        <div class="card-value text-success">{{ averageConsumptionCurrentMonth }} km/l</div>
-        <div class="card-sub-calc">Média de rodagem</div>
+        <div class="card-value text-success">{{ formatKmPerLiter(averageConsumptionCurrentMonth) }} km/l</div>
+        <div class="card-sub-calc">Km rodados ÷ litros repostos</div>
       </div>
 
       <!-- 4. Total Distance Traveled (All Time) -->
@@ -404,7 +390,7 @@ const formatDate = (dateStr) => {
         <span class="card-icon"><i class="fa-solid fa-road"></i></span>
         <div class="card-title">Média Geral / Km Total</div>
         <div class="card-value" style="color: var(--color-warning);">
-          {{ averageConsumptionAllTime }} <span style="font-size: 1rem; color: var(--text-secondary);">km/l</span>
+          {{ formatKmPerLiter(averageConsumptionAllTime) }} <span style="font-size: 1rem; color: var(--text-secondary);">km/l</span>
         </div>
         <div class="card-sub-calc">Distância total: {{ totalDistanceAllTime }} km</div>
       </div>
@@ -527,6 +513,11 @@ const formatDate = (dateStr) => {
           </div>
 
           <label class="form-check">
+            <input type="checkbox" v-model="refillFullTank" />
+            <span>Completei o tanque <small>(necessário para o km/l entre tanques cheios)</small></span>
+          </label>
+
+          <label class="form-check">
             <input type="checkbox" v-model="refillRegisterInFinances" />
             <span>Registrar nas finanças <small>(cria o lançamento no Painel)</small></span>
           </label>
@@ -586,7 +577,7 @@ const formatDate = (dateStr) => {
                   <th>Km Rodados</th>
                   <th>Litros</th>
                   <th>Pagamento</th>
-                  <th>Média km/l</th>
+                  <th title="Calculado entre dois abastecimentos com tanque completado">km/l (tanque cheio)</th>
                   <th>Total Pago</th>
                   <th style="text-align: right;">Ações</th>
                 </tr>
@@ -599,7 +590,10 @@ const formatDate = (dateStr) => {
                     <span v-if="r.distanceTraveled > 0" class="distance-badge">+{{ r.distanceTraveled }} km</span>
                     <span v-else class="text-muted">-</span>
                   </td>
-                  <td>{{ r.liters.toFixed(2) }} L</td>
+                  <td>
+                    {{ r.liters.toFixed(2) }} L
+                    <span v-if="r.fullTank" class="full-tank-badge" title="Tanque completado">cheio</span>
+                  </td>
                   <td>
                     <span v-if="r.paymentType === 'card'" class="payment-badge-card" :title="'Vínculo financeiro: ' + r.cardName">
                       💳 {{ r.cardName }}
@@ -610,8 +604,8 @@ const formatDate = (dateStr) => {
                     <span v-if="r.registerInFinances === false" class="no-finance-badge" title="Este abastecimento não gera lançamento nas finanças">sem lançamento</span>
                   </td>
                   <td>
-                    <span v-if="r.kmPerLiter > 0" class="consumption-badge">{{ r.kmPerLiter.toFixed(2) }} km/l</span>
-                    <span v-else class="text-muted" title="Primeiro abastecimento / odômetro inicial">-</span>
+                    <span v-if="r.kmPerLiter" class="consumption-badge">{{ r.kmPerLiter.toFixed(2) }} km/l</span>
+                    <span v-else class="text-muted" title="O km/l é calculado entre dois abastecimentos com o tanque completado">-</span>
                   </td>
                   <td class="text-danger font-semibold">{{ formatCurrency(r.totalAmount) }}</td>
                   <td style="text-align: right;">
@@ -647,7 +641,7 @@ const formatDate = (dateStr) => {
                   <div>
                     <span class="detail-label">Média:</span>
                     <span class="detail-value">
-                      <span v-if="r.kmPerLiter > 0" class="consumption-badge">{{ r.kmPerLiter.toFixed(2) }} km/l</span>
+                      <span v-if="r.kmPerLiter" class="consumption-badge">{{ r.kmPerLiter.toFixed(2) }} km/l</span>
                       <span v-else class="text-muted">-</span>
                     </span>
                   </div>
@@ -661,7 +655,10 @@ const formatDate = (dateStr) => {
                   </div>
                   <div style="grid-column: span 2;">
                     <span class="detail-label">Litros:</span>
-                    <span class="detail-value">{{ r.liters.toFixed(2) }} L ({{ formatCurrency(r.pricePerLiter) }}/L)</span>
+                    <span class="detail-value">
+                      {{ r.liters.toFixed(2) }} L ({{ formatCurrency(r.pricePerLiter) }}/L)
+                      <span v-if="r.fullTank" class="full-tank-badge">cheio</span>
+                    </span>
                   </div>
                   <div v-if="r.info" style="grid-column: span 2; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 0.25rem; font-style: italic;">
                     <span class="detail-label">Obs:</span>
@@ -795,6 +792,17 @@ const formatDate = (dateStr) => {
   font-weight: 600;
   font-size: 0.75rem;
   display: inline-block;
+}
+
+.full-tank-badge {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-info);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .no-finance-badge {

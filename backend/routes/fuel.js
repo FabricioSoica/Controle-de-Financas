@@ -1,5 +1,4 @@
 const express = require('express');
-const FuelRefill = require('../models/FuelRefill');
 const FuelRefillService = require('../services/FuelRefillService');
 const authMiddleware = require('../middleware/auth');
 
@@ -21,65 +20,12 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/fuel/summary - Get monthly summarized stats
+// GET /api/fuel/summary - Consumption averages per competence and overall
 router.get('/summary', async (req, res) => {
   try {
-    const refills = await FuelRefill.find({ userId: req.user.id }).sort({ date: 1, odometer: 1 });
-    const monthlySummary = {};
-    
-    for (let i = 0; i < refills.length; i++) {
-      const current = refills[i];
-      const m = current.month;
-      
-      if (!monthlySummary[m]) {
-        monthlySummary[m] = {
-          monthLabel: m,
-          totalAmount: 0,
-          totalLiters: 0,
-          totalDistance: 0,
-          refillCount: 0,
-          validLitersForKm: 0,
-          validDistanceForKm: 0
-        };
-      }
-      
-      monthlySummary[m].totalAmount += current.totalAmount;
-      monthlySummary[m].totalLiters += current.liters;
-      monthlySummary[m].refillCount += 1;
-      
-      if (i > 0) {
-        const prev = refills[i - 1];
-        const dist = current.odometer - prev.odometer;
-        const distance = dist >= 0 ? dist : 0;
-        
-        monthlySummary[m].totalDistance += distance;
-        monthlySummary[m].validDistanceForKm += distance;
-        monthlySummary[m].validLitersForKm += current.liters;
-      }
-    }
-    
-    const result = Object.values(monthlySummary).map(sum => {
-      const avgKmPerLiter = sum.validLitersForKm > 0 ? parseFloat((sum.validDistanceForKm / sum.validLitersForKm).toFixed(2)) : 0;
-      return {
-        monthLabel: sum.monthLabel,
-        totalAmount: parseFloat(sum.totalAmount.toFixed(2)),
-        totalLiters: parseFloat(sum.totalLiters.toFixed(2)),
-        totalDistance: sum.totalDistance,
-        refillCount: sum.refillCount,
-        avgKmPerLiter
-      };
-    });
-    
-    // Sort summary by month (newest month first)
-    result.sort((a, b) => {
-      const [am, ay] = a.monthLabel.split('/');
-      const [bm, by] = b.monthLabel.split('/');
-      return `${by}-${bm}`.localeCompare(`${ay}-${am}`);
-    });
-    
-    res.json(result);
+    res.json(await new FuelRefillService(req.user.id).summary());
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar sumário de consumo: ' + error.message });
+    sendError(res, error, 'Erro ao buscar sumário de consumo');
   }
 });
 

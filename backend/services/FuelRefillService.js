@@ -8,15 +8,35 @@ const PAYMENT_TYPES = ['money', 'card'];
 const FUEL_CATEGORY = 'Transporte';
 
 const formatDate = (date) => new Date(date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+const competenceSortKey = (month) => month.split('/').reverse().join('-');
 
 class FuelRefillService {
   constructor(userId) {
     this.userId = userId;
   }
 
-  async list() {
+  async getAnnotatedRefills() {
     const refills = await FuelRefill.find({ userId: this.userId }).sort({ date: 1, odometer: 1 }).lean();
-    return FuelConsumptionCalculator.annotate(refills).reverse();
+    return FuelConsumptionCalculator.annotate(refills);
+  }
+
+  async list() {
+    return (await this.getAnnotatedRefills()).reverse();
+  }
+
+  async summary() {
+    const refills = await this.getAnnotatedRefills();
+    const byMonth = new Map();
+    for (const refill of refills) {
+      if (!byMonth.has(refill.month)) byMonth.set(refill.month, []);
+      byMonth.get(refill.month).push(refill);
+    }
+
+    const months = [...byMonth.entries()]
+      .map(([monthLabel, monthRefills]) => ({ monthLabel, ...FuelConsumptionCalculator.summarize(monthRefills) }))
+      .sort((a, b) => competenceSortKey(b.monthLabel).localeCompare(competenceSortKey(a.monthLabel)));
+
+    return { months, overall: FuelConsumptionCalculator.summarize(refills) };
   }
 
   async create(input) {
@@ -110,6 +130,7 @@ class FuelRefillService {
       paymentType,
       cardName,
       info: (pick('info') || '').trim(),
+      fullTank: Boolean(pick('fullTank')),
       registerInFinances: registerInFinances === undefined ? true : Boolean(registerInFinances)
     };
   }
