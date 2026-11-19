@@ -119,15 +119,6 @@ const migrateCreditCards = async () => {
       console.log(`[Migration] Cleaned up and dropped old 'cardconfigs' collection.`);
     }
     
-    // Force existing cards to close on 14 and due on 15 as requested
-    const updateResult = await CreditCard.updateMany(
-      {},
-      { $set: { closingDay: 14, dueDay: 15 } }
-    );
-    if (updateResult.modifiedCount > 0) {
-      console.log(`[Migration] Forced ${updateResult.modifiedCount} credit card configurations to closingDay 14 and dueDay 15.`);
-    }
-    
   } catch (err) {
     console.error('[Migration] Error migrating credit cards:', err);
   }
