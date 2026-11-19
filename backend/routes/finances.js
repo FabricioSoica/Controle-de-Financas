@@ -4,6 +4,8 @@ const MonthlyGoal = require('../models/MonthlyGoal');
 const CategoryConfig = require('../models/CategoryConfig');
 const authMiddleware = require('../middleware/auth');
 const FuelRefillService = require('../services/FuelRefillService');
+const TransactionParserService = require('../services/TransactionParserService');
+const { getAiModel } = require('../services/ai/aiModel');
 
 const router = express.Router();
 
@@ -272,6 +274,17 @@ router.get('/:month', async (req, res) => {
     res.json(transactions);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar lançamentos: ' + error.message });
+  }
+});
+
+// POST /api/finances/parse - Turn a free-text description into a transaction suggestion (not saved)
+router.post('/parse', async (req, res) => {
+  try {
+    const suggestion = await new TransactionParserService(req.user.id, getAiModel()).parse(req.body.text);
+    res.json(suggestion);
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ error: status === 500 ? 'Erro ao interpretar o lançamento: ' + error.message : error.message });
   }
 });
 

@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import CategoriesTab from './CategoriesTab.vue';
+import QuickEntryBar from './QuickEntryBar.vue';
+import TransactionConfirmModal from './TransactionConfirmModal.vue';
 import { getCompetenceYM, DEFAULT_COMPETENCE_START_DAY } from '../utils/competence';
 import { getUsageLevel } from '../utils/cardUsage';
 import { formatCurrency as formatMoney } from '../utils/format';
@@ -327,6 +329,15 @@ const fetchBalance = async () => {
 };
 
 const highUsageCards = ref([]);
+const quickSuggestion = ref(null);
+
+const handleQuickEntrySaved = (competence) => {
+  quickSuggestion.value = null;
+  emit('toast', { message: `Lançamento registrado na competência ${competence}.`, type: 'success' });
+  fetchTransactions();
+  fetchAnnualEvolution();
+  fetchDbCategories();
+};
 
 const fetchCardUsageAlerts = async () => {
   try {
@@ -1267,6 +1278,23 @@ const donutSegments = computed(() => {
         </span>
       </div>
     </div>
+
+    <QuickEntryBar
+      :token="token"
+      :apiUrl="apiUrl"
+      @parsed="quickSuggestion = $event"
+      @toast="emit('toast', $event)"
+    />
+
+    <TransactionConfirmModal
+      v-if="quickSuggestion"
+      :suggestion="quickSuggestion"
+      :token="token"
+      :apiUrl="apiUrl"
+      @close="quickSuggestion = null"
+      @saved="handleQuickEntrySaved"
+      @toast="emit('toast', $event)"
+    />
 
     <div v-if="highUsageCards.length > 0" class="card-usage-alert" role="alert">
       <i class="fa-solid fa-triangle-exclamation"></i>
